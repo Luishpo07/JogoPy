@@ -3,6 +3,13 @@ import sys
 import math
 import random
 
+def clamp(v, lo=0, hi=255):
+    return max(lo, min(hi, int(v)))
+
+def cc(*args):
+    """Clamp color values to valid 0-255 range."""
+    return tuple(clamp(v) for v in args)
+
 WIDTH, HEIGHT = 1280, 720
 FPS = 60
 
@@ -469,11 +476,158 @@ def draw_bg_particles(surf, particles, landscape_name, tick):
     for p in particles:
         t = p["type"]
         if t == "star":
-            alpha = 0.5 + 0.5 * math.sin(tick * 0.03 + p["phase"])
-            alpha *= p["alpha_base"]
+            alpha = max(0.0, min(1.0, (0.5 + 0.5 * math.sin(tick * 0.03 + p["phase"])) * p["alpha_base"]))
             sc = LANDSCAPES[landscape_name]["star_color"]
-            col = tuple(int(c * alpha) for c in sc)
+            col = cc(sc[0]*alpha, sc[1]*alpha, sc[2]*alpha)
             pygame.draw.circle(surf, col, (int(p["x"]), int(p["y"])), p["size"])
+        elif t == "nebula":
+            a = max(0.0, 0.3 + 0.1 * math.sin(p["phase"]))
+            neb = pygame.Surface((p["size"]*2, p["size"]*2), pygame.SRCALPHA)
+            r,g,b = p["color"]
+            pygame.draw.circle(neb, (r,g,b,clamp(50*a)), (p["size"],p["size"]), p["size"])
+            pygame.draw.circle(neb, (r,g,b,clamp(30*a)), (p["size"],p["size"]), int(p["size"]*0.6))
+            surf.blit(neb, (int(p["x"]-p["size"]), int(p["y"]-p["size"])))
+        elif t == "shooting_star":
+            a = max(0.0, math.sin(math.pi * p["life"] / p["max_life"]))
+            sc = p["color"]
+            col = cc(sc[0]*a, sc[1]*a, sc[2]*a)
+            trail_len = 30
+            ex, ey = int(p["x"]), int(p["y"])
+            sx2 = int(p["x"] - p["vx"] * trail_len / max(abs(p["vx"]), 0.1) * 5)
+            sy2 = int(p["y"] - p["vy"] * trail_len / max(abs(p["vx"]), 0.1) * 5)
+            if a > 0.05:
+                pygame.draw.line(surf, col, (sx2, sy2), (ex, ey), 2)
+                pygame.draw.circle(surf, col, (ex, ey), 2)
+        elif t == "ember":
+            a = max(0.0, 1.0 - p["life"] / p["max_life"])
+            sc = p["color"]
+            col = cc(sc[0]*a, sc[1]*a*0.5, 0)
+            pygame.draw.circle(surf, col, (int(p["x"]), int(p["y"])), p["size"])
+        elif t == "lava_bubble":
+            progress = p["pop_timer"] / p["max_timer"]
+            s = p["size"]
+            if progress < 0.7:
+                rise = int(progress * 10)
+                pygame.draw.circle(surf, (255, 80, 0), (int(p["x"]), int(HEIGHT - 82 - rise)), max(1, int(s * progress * 1.5)))
+                pygame.draw.circle(surf, (255, 140, 0), (int(p["x"]), int(HEIGHT - 82 - rise)), max(1, int(s * progress)))
+            else:
+                pop_a = max(0.0, 1.0 - (progress - 0.7) / 0.3)
+                r2 = max(1, int(s * 2.5 * (1 - pop_a * 0.5)))
+                if pop_a > 0:
+                    pygame.draw.circle(surf, cc(255, 120*pop_a, 0), (int(p["x"]), int(HEIGHT - 90)), r2, 2)
+        elif t == "smoke_column":
+            for puff in p["puffs"]:
+                a = max(0.0, 1.0 - puff["life"] / puff["max_life"])
+                s = max(1, int(puff["size"]))
+                gray = clamp(80 * a)
+                puff_surf = pygame.Surface((s*2, s*2), pygame.SRCALPHA)
+                pygame.draw.circle(puff_surf, (gray, gray, gray, clamp(120*a)), (s,s), s)
+                surf.blit(puff_surf, (int(puff["x"])-s, int(puff["y"])-s))
+        elif t == "bubble":
+            a = max(0.0, math.sin(math.pi * p["life"] / p["max_life"]))
+            sc = p["color"]
+            col = cc(sc[0]*a*0.6, sc[1]*a*0.8, sc[2]*a)
+            pygame.draw.circle(surf, col, (int(p["x"]), int(p["y"])), p["size"], 1)
+            if a > 0.3:
+                pygame.draw.circle(surf, (255,255,255), (int(p["x"])-1, int(p["y"])-1), max(1, p["size"]//3))
+        elif t == "jellyfish":
+            s = p["size"]
+            r,g,b = p["color"]
+            pulse = max(0.1, 0.7 + 0.3 * math.sin(p["phase"] * 3))
+            j_surf = pygame.Surface((s*4, s*4), pygame.SRCALPHA)
+            eh = max(2, int(s*1.5*pulse))
+            pygame.draw.ellipse(j_surf, (r,g,b,100), (s, s, s*2, eh))
+            if eh > 10:
+                pygame.draw.ellipse(j_surf, (r,g,b,180), (s+4, s+4, max(1,s*2-8), max(1,eh-8)))
+            for i in range(5):
+                tx = s + s//2 + (i-2)*s//3
+                ty = s + int(s*1.5*pulse)
+                wave = int(math.sin(p["phase"]*2 + i) * 6)
+                pygame.draw.line(j_surf, (r,g,b,80), (tx,ty), (tx+wave, ty+s//2+wave), 1)
+            surf.blit(j_surf, (int(p["x"])-s*2, int(p["y"])-s*2))
+        elif t == "fish":
+            s = p["size"]
+            r,g,b = p["color"]
+            facing = 1 if p["vx"] > 0 else -1
+            fish_surf = pygame.Surface((s*4, s*3), pygame.SRCALPHA)
+            cx, cy = s*2, s + int(s//2)
+            pygame.draw.ellipse(fish_surf, (r,g,b,200), (s//2, cy-s//2, s*3, s))
+            tail_x = cx - facing * s
+            points = [(tail_x, cy), (tail_x - facing*s, cy-s//2), (tail_x - facing*s, cy+s//2)]
+            pygame.draw.polygon(fish_surf, (r,g,b,180), points)
+            eye_x = cx + facing * s
+            pygame.draw.circle(fish_surf, (255,255,255,255), (eye_x, cy-2), 2)
+            pygame.draw.circle(fish_surf, (0,0,0,255), (eye_x, cy-2), 1)
+            surf.blit(fish_surf, (int(p["x"])-s*2, int(p["y"])-s-s//2))
+        elif t == "firefly":
+            a = max(0.0, 0.4 + 0.6 * abs(math.sin(p["phase"] * 2)))
+            sc = p["color"]
+            col = cc(sc[0]*a, sc[1]*a, sc[2]*a*0.5)
+            glow = pygame.Surface((p["size"]*6, p["size"]*6), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (*col, 40), (p["size"]*3, p["size"]*3), p["size"]*3)
+            surf.blit(glow, (int(p["x"])-p["size"]*3, int(p["y"])-p["size"]*3))
+            pygame.draw.circle(surf, col, (int(p["x"]), int(p["y"])), p["size"])
+        elif t == "leaf":
+            a = max(0.0, math.sin(math.pi * p["life"] / p["max_life"]))
+            if a > 0.05:
+                s = p["size"]
+                r,g,b = p["color"]
+                col = cc(r*a, g*a, b*a)
+                cx, cy = int(p["x"]), int(p["y"])
+                rot = p["rot"]
+                pts = [
+                    (cx + int(s*math.cos(rot)), cy + int(s*math.sin(rot))),
+                    (cx + int(s*0.4*math.cos(rot+2.2)), cy + int(s*0.4*math.sin(rot+2.2))),
+                    (cx + int(s*math.cos(rot+math.pi)), cy + int(s*math.sin(rot+math.pi))),
+                    (cx + int(s*0.4*math.cos(rot-2.2)), cy + int(s*0.4*math.sin(rot-2.2))),
+                ]
+                pygame.draw.polygon(surf, col, pts)
+        elif t == "spore":
+            for i, (tx, ty) in enumerate(p["trail"]):
+                a = i / max(len(p["trail"]), 1) * 0.4
+                r,g,b = p["color"]
+                col = cc(r*a, g*a, b*a*0.5)
+                pygame.draw.circle(surf, col, (int(tx), int(ty)), 2)
+            glow = pygame.Surface((p["size"]*8, p["size"]*8), pygame.SRCALPHA)
+            r,g,b = p["color"]
+            pygame.draw.circle(glow, (r,g,b,60), (p["size"]*4,p["size"]*4), p["size"]*4)
+            surf.blit(glow, (int(p["x"])-p["size"]*4, int(p["y"])-p["size"]*4))
+            pygame.draw.circle(surf, p["color"], (int(p["x"]), int(p["y"])), p["size"])
+        elif t == "snowflake":
+            a = max(0.0, math.sin(math.pi * p["life"] / p["max_life"]))
+            if a > 0.05:
+                cx, cy = int(p["x"]), int(p["y"])
+                col = cc(200*a, 220*a, 255*a)
+                s = p["size"]
+                rot = p.get("rot", 0) + tick * 0.02
+                for ang in [0, math.pi/3, 2*math.pi/3]:
+                    dx = int(s * 2 * math.cos(ang + rot))
+                    dy = int(s * 2 * math.sin(ang + rot))
+                    pygame.draw.line(surf, col, (cx-dx,cy-dy),(cx+dx,cy+dy), 1)
+        elif t == "aurora":
+            for xi in range(0, WIDTH, 3):
+                wave = math.sin(xi * 0.008 + tick * p["speed"] + p["offset"]) * p["amplitude"]
+                ay = int(p["y_base"] + wave)
+                thick = max(1, 3 + int(2 * math.sin(xi * 0.01 + tick * 0.02)))
+                a_val = clamp(30 + 20 * math.sin(xi * 0.005 + tick * 0.015))
+                r,g,b = p["color"]
+                aurora_surf = pygame.Surface((3, thick), pygame.SRCALPHA)
+                aurora_surf.fill((r,g,b,a_val))
+                surf.blit(aurora_surf, (xi, ay))
+        elif t == "ice_crystal":
+            cx, cy = int(p["x"]), int(p["y"])
+            s = p["size"]
+            glow_a = clamp(40 + 30 * math.sin(p["phase"] + tick * 0.03))
+            r,g,b = p["color"]
+            glow = pygame.Surface((s*4, s*4), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (r,g,b,glow_a), (s*2,s*2), s*2)
+            surf.blit(glow, (cx-s*2, cy-s*2))
+            for ang in range(6):
+                a = ang * math.pi / 3 + p["phase"]
+                ex2 = cx + int(s * math.cos(a))
+                ey2 = cy + int(s * math.sin(a))
+                pygame.draw.line(surf, (r,g,b), (cx,cy), (ex2,ey2), 2)
+                pygame.draw.circle(surf, (255,255,255), (ex2,ey2), 2)
         elif t == "nebula":
             a = 0.3 + 0.1 * math.sin(p["phase"])
             neb = pygame.Surface((p["size"]*2, p["size"]*2), pygame.SRCALPHA)
@@ -1437,8 +1591,8 @@ def draw_landscape_select(surf, font_title, font_small, font_big, selected_idx, 
                 sx3 = (sni*37+13) % card_w
                 sy3 = (sni*23+7) % (card_h//2)
                 a_s = 0.4+0.6*math.sin(tick*0.04+sni)
-                gray = int(200*a_s)
-                pygame.draw.circle(card,(gray,gray,200),(sx3,sy3),1+(sni%2))
+                gray = max(0, min(255, int(200*a_s)))
+                pygame.draw.circle(card,(gray,gray,min(255,200)),(sx3,sy3),1+(sni%2))
             # Planet
             for pr2 in range(25,0,-3):
                 angle2 = pr2/25
