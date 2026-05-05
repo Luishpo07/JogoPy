@@ -2,6 +2,7 @@ import pygame
 import sys
 import math
 import random
+import os
 
 def clamp(v, lo=0, hi=255):
     return max(lo, min(hi, int(v)))
@@ -211,7 +212,7 @@ def make_bg_particles(landscape_name):
                 "size": random.randint(1, 3),
                 "alpha_base": random.uniform(0.3, 1.0),
                 "phase": random.uniform(0, math.pi * 2),
-                "layer": random.choice([0, 1, 2]),  # parallax layer
+                "layer": random.choice([0, 1, 2]),
             })
         for _ in range(5):
             particles.append({
@@ -467,7 +468,7 @@ def update_bg_particles(particles, landscape_name, tick):
             if p["y"] < 0: p["y"] = HEIGHT - 100
             if p["y"] > HEIGHT - 80: p["y"] = 50
         elif t == "aurora":
-            pass  # animado no draw
+            pass
         elif t == "ice_crystal":
             p["phase"] += 0.02
 
@@ -618,161 +619,6 @@ def draw_bg_particles(surf, particles, landscape_name, tick):
             cx, cy = int(p["x"]), int(p["y"])
             s = p["size"]
             glow_a = clamp(40 + 30 * math.sin(p["phase"] + tick * 0.03))
-            r,g,b = p["color"]
-            glow = pygame.Surface((s*4, s*4), pygame.SRCALPHA)
-            pygame.draw.circle(glow, (r,g,b,glow_a), (s*2,s*2), s*2)
-            surf.blit(glow, (cx-s*2, cy-s*2))
-            for ang in range(6):
-                a = ang * math.pi / 3 + p["phase"]
-                ex2 = cx + int(s * math.cos(a))
-                ey2 = cy + int(s * math.sin(a))
-                pygame.draw.line(surf, (r,g,b), (cx,cy), (ex2,ey2), 2)
-                pygame.draw.circle(surf, (255,255,255), (ex2,ey2), 2)
-        elif t == "nebula":
-            a = 0.3 + 0.1 * math.sin(p["phase"])
-            neb = pygame.Surface((p["size"]*2, p["size"]*2), pygame.SRCALPHA)
-            r,g,b = p["color"]
-            pygame.draw.circle(neb, (r,g,b,int(50*a)), (p["size"],p["size"]), p["size"])
-            pygame.draw.circle(neb, (r,g,b,int(30*a)), (p["size"],p["size"]), int(p["size"]*0.6))
-            surf.blit(neb, (int(p["x"]-p["size"]), int(p["y"]-p["size"])))
-        elif t == "shooting_star":
-            a = math.sin(math.pi * p["life"] / p["max_life"])
-            sc = p["color"]
-            col = tuple(int(c*a) for c in sc)
-            trail_len = 30
-            ex, ey = int(p["x"]), int(p["y"])
-            sx2 = int(p["x"] - p["vx"] * trail_len / p["vx"] * 5)
-            sy2 = int(p["y"] - p["vy"] * trail_len / max(abs(p["vx"]),0.1) * 5)
-            if a > 0.05:
-                pygame.draw.line(surf, col, (sx2, sy2), (ex, ey), 2)
-                pygame.draw.circle(surf, col, (ex, ey), 2)
-        elif t == "ember":
-            a = 1.0 - p["life"] / p["max_life"]
-            sc = p["color"]
-            col = (int(sc[0]*a), int(sc[1]*a*0.5), 0)
-            pygame.draw.circle(surf, col, (int(p["x"]), int(p["y"])), p["size"])
-        elif t == "lava_bubble":
-            progress = p["pop_timer"] / p["max_timer"]
-            s = p["size"]
-            if progress < 0.7:
-                rise = int(progress * 10)
-                col = (255, 80, 0)
-                pygame.draw.circle(surf, col, (int(p["x"]), int(HEIGHT - 82 - rise)), int(s * progress * 1.5))
-                pygame.draw.circle(surf, (255, 140, 0), (int(p["x"]), int(HEIGHT - 82 - rise)), max(1, int(s * progress)))
-            else:
-                # Pop
-                pop_a = 1.0 - (progress - 0.7) / 0.3
-                r2 = int(s * 2.5 * (1 - pop_a * 0.5))
-                if pop_a > 0:
-                    pygame.draw.circle(surf, (255, int(120*pop_a), 0), (int(p["x"]), int(HEIGHT - 90)), r2, 2)
-        elif t == "smoke_column":
-            for puff in p["puffs"]:
-                a = 1.0 - puff["life"] / puff["max_life"]
-                s = int(puff["size"])
-                gray = int(80 * a)
-                puff_surf = pygame.Surface((s*2, s*2), pygame.SRCALPHA)
-                pygame.draw.circle(puff_surf, (gray, gray, gray, int(120*a)), (s,s), s)
-                surf.blit(puff_surf, (int(puff["x"])-s, int(puff["y"])-s))
-        elif t == "bubble":
-            a = math.sin(math.pi * p["life"] / p["max_life"])
-            sc = p["color"]
-            col = (int(sc[0]*a*0.6), int(sc[1]*a*0.8), int(sc[2]*a))
-            pygame.draw.circle(surf, col, (int(p["x"]), int(p["y"])), p["size"], 1)
-            # Inner highlight
-            if a > 0.3:
-                pygame.draw.circle(surf, (255,255,255), (int(p["x"])-1, int(p["y"])-1), max(1, p["size"]//3))
-        elif t == "jellyfish":
-            s = p["size"]
-            r,g,b = p["color"]
-            pulse = 0.7 + 0.3 * math.sin(p["phase"] * 3)
-            j_surf = pygame.Surface((s*4, s*4), pygame.SRCALPHA)
-            pygame.draw.ellipse(j_surf, (r,g,b,100), (s, s, s*2, int(s*1.5*pulse)))
-            pygame.draw.ellipse(j_surf, (r,g,b,180), (s+4, s+4, s*2-8, int(s*1.5*pulse)-8))
-            # Tentacles
-            for i in range(5):
-                tx = s + s//2 + (i-2)*s//3
-                ty = s + int(s*1.5*pulse)
-                wave = int(math.sin(p["phase"]*2 + i) * 6)
-                pygame.draw.line(j_surf, (r,g,b,80), (tx,ty), (tx+wave, ty+s//2+wave), 1)
-            surf.blit(j_surf, (int(p["x"])-s*2, int(p["y"])-s*2))
-        elif t == "fish":
-            s = p["size"]
-            r,g,b = p["color"]
-            facing = 1 if p["vx"] > 0 else -1
-            fish_surf = pygame.Surface((s*4, s*3), pygame.SRCALPHA)
-            cx, cy = s*2, s + int(s//2)
-            # Body
-            pygame.draw.ellipse(fish_surf, (r,g,b,200), (s//2, cy-s//2, s*3, s))
-            # Tail
-            tail_x = cx - facing * s
-            points = [(tail_x, cy), (tail_x - facing*s, cy-s//2), (tail_x - facing*s, cy+s//2)]
-            pygame.draw.polygon(fish_surf, (r,g,b,180), points)
-            # Eye
-            eye_x = cx + facing * s
-            pygame.draw.circle(fish_surf, (255,255,255,255), (eye_x, cy-2), 2)
-            pygame.draw.circle(fish_surf, (0,0,0,255), (eye_x, cy-2), 1)
-            surf.blit(fish_surf, (int(p["x"])-s*2, int(p["y"])-s-s//2))
-        elif t == "firefly":
-            a = 0.4 + 0.6 * abs(math.sin(p["phase"] * 2))
-            sc = p["color"]
-            col = (int(sc[0]*a), int(sc[1]*a), int(sc[2]*a*0.5))
-            # Glow
-            glow = pygame.Surface((p["size"]*6, p["size"]*6), pygame.SRCALPHA)
-            pygame.draw.circle(glow, (*col, 40), (p["size"]*3, p["size"]*3), p["size"]*3)
-            surf.blit(glow, (int(p["x"])-p["size"]*3, int(p["y"])-p["size"]*3))
-            pygame.draw.circle(surf, col, (int(p["x"]), int(p["y"])), p["size"])
-        elif t == "leaf":
-            a = math.sin(math.pi * p["life"] / p["max_life"])
-            if a > 0.05:
-                s = p["size"]
-                r,g,b = p["color"]
-                col = (int(r*a), int(g*a), int(b*a))
-                cx, cy = int(p["x"]), int(p["y"])
-                rot = p["rot"]
-                pts = [
-                    (cx + int(s*math.cos(rot)), cy + int(s*math.sin(rot))),
-                    (cx + int(s*0.4*math.cos(rot+2.2)), cy + int(s*0.4*math.sin(rot+2.2))),
-                    (cx + int(s*math.cos(rot+math.pi)), cy + int(s*math.sin(rot+math.pi))),
-                    (cx + int(s*0.4*math.cos(rot-2.2)), cy + int(s*0.4*math.sin(rot-2.2))),
-                ]
-                pygame.draw.polygon(surf, col, pts)
-        elif t == "spore":
-            # Trail
-            for i, (tx, ty) in enumerate(p["trail"]):
-                a = i / max(len(p["trail"]), 1) * 0.4
-                r,g,b = p["color"]
-                col = (int(r*a), int(g*a), int(b*a*0.5))
-                pygame.draw.circle(surf, col, (int(tx), int(ty)), 2)
-            glow = pygame.Surface((p["size"]*8, p["size"]*8), pygame.SRCALPHA)
-            r,g,b = p["color"]
-            pygame.draw.circle(glow, (r,g,b,60), (p["size"]*4,p["size"]*4), p["size"]*4)
-            surf.blit(glow, (int(p["x"])-p["size"]*4, int(p["y"])-p["size"]*4))
-            pygame.draw.circle(surf, p["color"], (int(p["x"]), int(p["y"])), p["size"])
-        elif t == "snowflake":
-            a = math.sin(math.pi * p["life"] / p["max_life"])
-            if a > 0.05:
-                cx, cy = int(p["x"]), int(p["y"])
-                col = tuple(int(c * a) for c in (200, 220, 255))
-                s = p["size"]
-                rot = p.get("rot", 0) + tick * 0.02
-                for ang in [0, math.pi/3, 2*math.pi/3]:
-                    dx = int(s * 2 * math.cos(ang + rot))
-                    dy = int(s * 2 * math.sin(ang + rot))
-                    pygame.draw.line(surf, col, (cx-dx,cy-dy),(cx+dx,cy+dy), 1)
-        elif t == "aurora":
-            for xi in range(0, WIDTH, 3):
-                wave = math.sin(xi * 0.008 + tick * p["speed"] + p["offset"]) * p["amplitude"]
-                ay = int(p["y_base"] + wave)
-                thick = 3 + int(2 * math.sin(xi * 0.01 + tick * 0.02))
-                a_val = int(30 + 20 * math.sin(xi * 0.005 + tick * 0.015))
-                r,g,b = p["color"]
-                aurora_surf = pygame.Surface((3, thick), pygame.SRCALPHA)
-                aurora_surf.fill((r,g,b,a_val))
-                surf.blit(aurora_surf, (xi, ay))
-        elif t == "ice_crystal":
-            cx, cy = int(p["x"]), int(p["y"])
-            s = p["size"]
-            glow_a = int(40 + 30 * math.sin(p["phase"] + tick * 0.03))
             r,g,b = p["color"]
             glow = pygame.Surface((s*4, s*4), pygame.SRCALPHA)
             pygame.draw.circle(glow, (r,g,b,glow_a), (s*2,s*2), s*2)
@@ -1118,26 +964,22 @@ def draw_background(surf, landscape_name, bg_particles, tick):
         pygame.draw.line(surf, (r, g, b), (0, y), (WIDTH, y))
 
     if landscape_name == "Vulcão":
-        # Lava animada com ondas detalhadas
         for i in range(0, WIDTH, 4):
             wave = int(math.sin(i * 0.04 + tick * 0.06) * 10 + math.sin(i * 0.09 + tick * 0.04) * 5)
             lava_r = 180 + int(40 * math.sin(i * 0.03 + tick * 0.08))
             lava_g = 40 + int(20 * math.sin(i * 0.05 + tick * 0.05))
             pygame.draw.line(surf, (lava_r, lava_g, 0),
                              (i, HEIGHT - 90 + wave), (i, HEIGHT))
-        # Lava glow
         for i in range(0, WIDTH, 8):
             wave = int(math.sin(i * 0.04 + tick * 0.06) * 10)
             glow_s = pygame.Surface((8, 20), pygame.SRCALPHA)
             glow_s.fill((255, 120, 0, 40))
             surf.blit(glow_s, (i, HEIGHT - 110 + wave))
-        # Volcano silhouette
         for side, sign in [(-1, 1), (1, -1)]:
             base_x = WIDTH // 2 + side * 500
             tip_x  = WIDTH // 2 + side * 200
             pts = [(base_x, HEIGHT - 90), (tip_x, HEIGHT - 320), (WIDTH//2 + side*120, HEIGHT-90)]
             pygame.draw.polygon(surf, (50, 15, 5), pts)
-            # Crater glow
             crater_x = tip_x - side * 20
             for r_glow in range(30, 0, -5):
                 a = int(80 * (r_glow / 30))
@@ -1146,14 +988,12 @@ def draw_background(surf, landscape_name, bg_particles, tick):
                 surf.blit(glow_c, (crater_x - r_glow, HEIGHT - 325 - r_glow))
 
     elif landscape_name == "Oceano":
-        # Fundo marinho com gradiente profundo
         for y in range(HEIGHT - 150, HEIGHT):
             depth = (y - (HEIGHT-150)) / 150
             floor_r = int(5 * (1-depth) + 15 * depth)
             floor_g = int(40 * (1-depth) + 60 * depth)
             floor_b = int(60 * (1-depth) + 80 * depth)
             pygame.draw.line(surf, (floor_r, floor_g, floor_b), (0, y), (WIDTH, y))
-        # Múltiplas camadas de ondas
         for layer, (amp, speed, alpha_val) in enumerate([(12, 0.04, 100), (8, 0.06, 70), (5, 0.09, 50)]):
             wave_surf = pygame.Surface((WIDTH, 40), pygame.SRCALPHA)
             for i in range(0, WIDTH, 2):
@@ -1162,11 +1002,9 @@ def draw_background(surf, landscape_name, bg_particles, tick):
                 pygame.draw.line(wave_surf, (0, 150-layer*20, 220-layer*30, alpha_val),
                                  (i, py2), (i, py2 + 6 + amp), 2)
             surf.blit(wave_surf, (0, HEIGHT - 130 + layer * 15))
-        # Coral silhueta
         for i, bx2 in enumerate(range(0, WIDTH, 90)):
             h_coral = 30 + (i * 41 % 40)
             coral_col = random.choice([(180, 60, 60), (60, 180, 140), (220, 100, 60)])
-            # Deterministic per index
             coral_col = [(180,60,60),(60,180,140),(220,100,60),(180,80,180),(60,160,100)][i % 5]
             for branch in range(3):
                 boff = (branch - 1) * 12
@@ -1176,7 +1014,6 @@ def draw_background(surf, landscape_name, bg_particles, tick):
                 pygame.draw.circle(surf, coral_col, (bx2+30+boff, HEIGHT-92-h_coral+branch*10), 5)
 
     elif landscape_name == "Floresta":
-        # Camadas de floresta em parallax
         for layer_idx, (tree_scale, alpha_val, offset) in enumerate([(0.6, 60, 0), (0.8, 100, 40), (1.0, 200, 80)]):
             tree_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             for i, bx2 in enumerate(range(-80 + layer_idx * 20, WIDTH + 80, int(120 * tree_scale))):
@@ -1184,10 +1021,8 @@ def draw_background(surf, landscape_name, bg_particles, tick):
                 ty = HEIGHT - offset - h_tree
                 trunk_w = int(16 * tree_scale)
                 trunk_h = int(30 * tree_scale)
-                dark_green = (10 + layer_idx * 10, 40 + layer_idx * 10, 5)
                 pygame.draw.rect(tree_surf, (40, 25, 10, alpha_val),
                                  (bx2 + int(50*tree_scale), ty + h_tree - trunk_h, trunk_w, trunk_h))
-                # Foliage layers
                 for fl in range(3):
                     w_f = int((90 - fl*15) * tree_scale)
                     h_f = int((45 - fl*10) * tree_scale)
@@ -1197,7 +1032,6 @@ def draw_background(surf, landscape_name, bg_particles, tick):
                     pygame.draw.ellipse(tree_surf, (10, g_val, 10, alpha_val), (fx, fy, w_f, h_f))
                     pygame.draw.ellipse(tree_surf, (20, g_val+30, 15, alpha_val//2), (fx+5, fy+5, w_f-10, h_f-10))
             surf.blit(tree_surf, (0, 0))
-        # Ground fog
         fog_surf = pygame.Surface((WIDTH, 60), pygame.SRCALPHA)
         for fy in range(60):
             a_fog = int(60 * (1 - fy / 60))
@@ -1205,8 +1039,6 @@ def draw_background(surf, landscape_name, bg_particles, tick):
         surf.blit(fog_surf, (0, HEIGHT - 150))
 
     elif landscape_name == "Tundra":
-        # Céu de aurora boreal já feito nas partículas
-        # Montanhas em camadas
         for layer_idx, (m_scale, m_alpha, m_offset) in enumerate([(0.6, 80, 0), (0.8, 140, 30), (1.0, 220, 60)]):
             mnt_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             base_colors = [(140,160,200),(160,185,220),(190,215,240)]
@@ -1219,30 +1051,25 @@ def draw_background(surf, landscape_name, bg_particles, tick):
                 bw = int(220 * m_scale)
                 pts = [(bx2, HEIGHT-90-m_offset), (bx2+bw//2, my), (bx2+bw, HEIGHT-90-m_offset)]
                 pygame.draw.polygon(mnt_surf, (*m_col, m_alpha), pts)
-                # Snow cap
                 snow_w = int(bw * 0.25)
                 snow_pts = [(bx2+bw//2-snow_w, my+int(h_m*0.25)), (bx2+bw//2, my), (bx2+bw//2+snow_w, my+int(h_m*0.25))]
                 pygame.draw.polygon(mnt_surf, (*s_col, m_alpha), snow_pts)
             surf.blit(mnt_surf, (0, 0))
-        # Snow ground
         for i in range(0, WIDTH, 6):
             drift = int(math.sin(i * 0.03 + tick * 0.005) * 5)
             pygame.draw.line(surf, (230, 240, 255), (i, HEIGHT - 92 + drift), (i, HEIGHT - 88 + drift), 3)
 
     elif landscape_name == "Cosmos":
-        # Planeta ao fundo
         planet_x, planet_y = WIDTH - 200, 150
         planet_r = 90
         for pr in range(planet_r, 0, -2):
             angle = pr / planet_r
             pc = (int(30 + 60*angle), int(10 + 40*angle), int(80 + 80*angle))
             pygame.draw.circle(surf, pc, (planet_x, planet_y), pr)
-        # Ring
         ring_surf = pygame.Surface((300, 60), pygame.SRCALPHA)
         pygame.draw.ellipse(ring_surf, (120, 90, 200, 80), (0, 20, 300, 20))
         pygame.draw.ellipse(ring_surf, (0,0,0,0), (40, 24, 220, 12))
         surf.blit(ring_surf, (planet_x - 150, planet_y - 10))
-        # Stars (big)
         for bx3 in [(100, 80), (450, 200), (900, 120), (200, 400), (750, 300)]:
             pulse = 0.7 + 0.3 * math.sin(tick * 0.05 + bx3[0])
             col_s = tuple(int(c*pulse) for c in (255, 240, 200))
@@ -1270,7 +1097,6 @@ def draw_platforms(surf, platforms, landscape_name):
 
 # ── Tela de seleção de personagens ────────────────────────────────────────────
 def draw_character_select(surf, font_title, font_small, font_big, css, tick):
-    # Background
     for y in range(HEIGHT):
         t = y / HEIGHT
         r = int(5  * (1-t) + 15 * t)
@@ -1278,7 +1104,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         b = int(20 * (1-t) + 40 * t)
         pygame.draw.line(surf, (r, g, b), (0, y), (WIDTH, y))
 
-    # Title
     title = font_title.render("ESCOLHA SEU LUTADOR", True, C_YELLOW)
     surf.blit(title, (WIDTH//2 - title.get_width()//2, 18))
 
@@ -1304,19 +1129,16 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         if p2_sel and css["p2_ready"]:
             hover_off += int(math.sin(tick * 0.08 + 1) * 3)
 
-        # Shadow
         shad = pygame.Surface((card_w+8, card_h+8), pygame.SRCALPHA)
         shad.fill((0,0,0,80))
         surf.blit(shad, (cx-2, cy+8-hover_off))
 
-        # Card background gradient
         card = pygame.Surface((card_w, card_h))
         for row in range(card_h):
             t2 = row/card_h
             base_r = int(20*(1-t2)+35*t2)
             base_g = int(15*(1-t2)+25*t2)
             base_b = int(45*(1-t2)+70*t2)
-            # Tint card with char color
             cr2, cg2, cb2 = char["color"]
             mix = 0.15
             base_r = int(base_r*(1-mix) + cr2*mix)
@@ -1326,11 +1148,9 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
 
         surf.blit(card, (cx, cy - hover_off))
 
-        # Character preview (mini body)
         pcx = cx + card_w//2
         pcy = cy - hover_off + 135
 
-        # Idle bounce
         bounce = int(math.sin(tick * 0.06 + i) * 3)
         if p1_sel or p2_sel:
             bounce = int(math.sin(tick * 0.1 + i) * 5)
@@ -1340,36 +1160,33 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         by2 = pcy - ch2 + bounce
 
         body_r = pygame.Rect(bx2, by2, cw2, ch2)
-        pygame.draw.rect(card, (0,0,0), (0,0,1,1))  # dummy
+        pygame.draw.rect(card, (0,0,0), (0,0,1,1))
         pygame.draw.rect(surf, char["dark_color"], body_r, border_radius=10)
         pygame.draw.rect(surf, char["color"], body_r.inflate(-6,-6), border_radius=8)
         pygame.draw.rect(surf, char["special_color"], (bx2+4, by2+4, cw2-8, 4), border_radius=2)
-        # Eye
+
         eye_y = by2 + ch2//3
         pygame.draw.circle(surf, C_WHITE, (bx2 + cw2//2 + 8, eye_y), 5)
         pygame.draw.circle(surf, C_DARK, (bx2 + cw2//2 + 9, eye_y), 3)
-        # Arms
+
         arm_swing = int(math.sin(tick * 0.07 + i) * 6)
         pygame.draw.line(surf, char["dark_color"],
                          (bx2 + cw2, by2 + ch2//2),
                          (bx2 + cw2 + 10 + arm_swing, by2 + ch2//2 - 8), 4)
-        # Legs
+
         leg_s = int(math.sin(tick * 0.07 + i) * 8)
         pygame.draw.line(surf, char["dark_color"],
                          (bx2+cw2//3, by2+ch2), (bx2+cw2//3-leg_s, by2+ch2+12), 4)
         pygame.draw.line(surf, char["dark_color"],
                          (bx2+2*cw2//3, by2+ch2), (bx2+2*cw2//3+leg_s, by2+ch2+12), 4)
 
-        # Name
         name_col = char["accent"] if (p1_sel or p2_sel) else C_WHITE
         name_surf = font_small.render(char["name"], True, name_col)
         surf.blit(name_surf, (cx + card_w//2 - name_surf.get_width()//2, cy - hover_off + 160))
 
-        # Description
         desc_s = font_small.render(char["desc"], True, (170, 160, 200))
         surf.blit(desc_s, (cx + card_w//2 - desc_s.get_width()//2, cy - hover_off + 185))
 
-        # Ability badge
         abil_s = font_small.render(char["ability"], True, char["special_color"])
         abil_bg = pygame.Surface((abil_s.get_width()+14, abil_s.get_height()+6), pygame.SRCALPHA)
         r3,g3,b3 = char["special_color"]
@@ -1377,7 +1194,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         surf.blit(abil_bg, (cx + card_w//2 - abil_s.get_width()//2 - 7, cy - hover_off + 207))
         surf.blit(abil_s, (cx + card_w//2 - abil_s.get_width()//2, cy - hover_off + 210))
 
-        # Stats bars
         stat_labels = ["FOR", "VEL", "PUL", "DEF"]
         stat_keys = ["força", "velocidade", "pulo", "defesa"]
         bar_y = cy - hover_off + 240
@@ -1392,9 +1208,7 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
             bar_c = char["accent"] if (p1_sel or p2_sel) else (100, 90, 130)
             pygame.draw.rect(surf, bar_c, (bar_x2, bar_y + si*14, fill_w, 8), border_radius=4)
 
-        # Border
         if p1_sel and p2_sel:
-            # Split border blue+red
             pygame.draw.rect(surf, C_P1, (cx, cy-hover_off, card_w//2, card_h), 3, border_radius=8)
             pygame.draw.rect(surf, C_P2, (cx+card_w//2, cy-hover_off, card_w//2, card_h), 3, border_radius=8)
         elif p1_sel:
@@ -1408,7 +1222,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         else:
             pygame.draw.rect(surf, (60, 55, 90), (cx, cy-hover_off, card_w, card_h), 1, border_radius=8)
 
-        # Ready badge
         if p1_sel and css["p1_ready"]:
             r_surf = font_small.render("P1 PRONTO!", True, C_P1)
             r_bg = pygame.Surface((r_surf.get_width()+10, r_surf.get_height()+4), pygame.SRCALPHA)
@@ -1422,7 +1235,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
             surf.blit(r_bg, (cx+card_w//2-r_surf.get_width()//2-5, cy-hover_off+card_h-20))
             surf.blit(r_surf, (cx+card_w//2-r_surf.get_width()//2, cy-hover_off+card_h-18))
 
-        # P1/P2 cursor icons above card
         if p1_sel:
             lbl = font_small.render("P1", True, C_P1)
             surf.blit(lbl, (cx + card_w//2 - lbl.get_width()//2, cy - hover_off - 26))
@@ -1434,11 +1246,9 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
             arrow = font_big.render("▼", True, C_P2)
             surf.blit(arrow, (cx + card_w//2 - arrow.get_width()//2 + (16 if p1_sel else 0), cy - hover_off - 46))
 
-    # Player 1 controls (bottom left)
     p1_char = CHARACTERS[css["p1_idx"]]
     p2_char = CHARACTERS[css["p2_idx"]]
 
-    # P1 info panel
     p1_panel = pygame.Surface((300, 90), pygame.SRCALPHA)
     p1_panel.fill((30,80,180,100))
     surf.blit(p1_panel, (20, HEIGHT-110))
@@ -1453,7 +1263,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         p1_ready_hint = font_small.render("ENTER: confirmar", True, (150,180,220))
         surf.blit(p1_ready_hint, (30, HEIGHT-60))
 
-    # P2 info panel
     p2_panel = pygame.Surface((300, 90), pygame.SRCALPHA)
     p2_panel.fill((180,30,30,100))
     surf.blit(p2_panel, (WIDTH-320, HEIGHT-110))
@@ -1468,7 +1277,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         p2_ready_hint = font_small.render("SPACE: confirmar", True, (220,150,150))
         surf.blit(p2_ready_hint, (WIDTH-310, HEIGHT-60))
 
-    # Center hint
     if css["p1_ready"] and css["p2_ready"]:
         blink = int(tick * 0.1) % 2 == 0
         if blink:
@@ -1508,13 +1316,14 @@ def draw_intro(surf, font_title, font_small):
     surf.blit(start, (WIDTH//2 - start.get_width()//2, y + 20))
 
 
-def draw_landscape_select(surf, font_title, font_small, font_big, selected_idx, tick):
-    for y in range(HEIGHT):
-        t = y / HEIGHT
-        r = int(10 * (1-t) + 30 * t)
-        g = int(8  * (1-t) + 15 * t)
-        b = int(30 * (1-t) + 60 * t)
-        pygame.draw.line(surf, (r, g, b), (0, y), (WIDTH, y))
+def draw_landscape_select(surf, font_title, font_small, font_big, selected_idx, tick, bg_images):
+    name = LANDSCAPE_NAMES[selected_idx]
+
+    surf.blit(bg_images[name], (0, 0))
+
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 90))
+    surf.blit(overlay, (0, 0))
 
     title = font_title.render("ESCOLHA A ARENA", True, C_YELLOW)
     surf.blit(title, (WIDTH//2 - title.get_width()//2, 30))
@@ -1547,13 +1356,10 @@ def draw_landscape_select(surf, font_title, font_small, font_big, selected_idx, 
             cb = int(top_c[2]*(1-t2) + bot_c[2]*t2)
             pygame.draw.line(card, (cr, cg, cb), (0, row), (card_w, row))
 
-        # Mini scene on card
         if name == "Vulcão":
-            # Lava wave
             for xi in range(0, card_w, 3):
                 wave2 = int(math.sin(xi*0.15+tick*0.06)*4)
                 pygame.draw.line(card, (200,50,0), (xi, card_h-35+wave2),(xi,card_h),2)
-            # Volcano
             pygame.draw.polygon(card, (60,15,5),
                                  [(card_w//2-40,card_h-35),(card_w//2,card_h-100),(card_w//2+40,card_h-35)])
             pygame.draw.circle(card, (255,80,0),(card_w//2, card_h-100),8)
@@ -1561,7 +1367,6 @@ def draw_landscape_select(surf, font_title, font_small, font_big, selected_idx, 
             for xi in range(0, card_w, 2):
                 wave2 = int(math.sin(xi*0.08+tick*0.04)*5)
                 pygame.draw.line(card,(0,100,160),(xi,card_h-40+wave2),(xi,card_h),2)
-            # Fish
             fish_x = int((tick*0.5) % (card_w+20))
             pygame.draw.ellipse(card,(255,200,50),(fish_x-12,card_h-65,20,10))
             pygame.draw.polygon(card,(255,200,50),[(fish_x-12,card_h-60),(fish_x-22,card_h-55),(fish_x-22,card_h-65)])
@@ -1577,30 +1382,19 @@ def draw_landscape_select(surf, font_title, font_small, font_big, selected_idx, 
                 mh = 30+(mi*19%30)
                 pygame.draw.polygon(card,(160,190,230),[(mx,card_h-35),(mx+30,card_h-35-mh),(mx+60,card_h-35)])
                 pygame.draw.polygon(card,(230,245,255),[(mx+18,card_h-35-mh+8),(mx+30,card_h-35-mh),(mx+42,card_h-35-mh+8)])
-            # Snowflakes
-            for sni in range(4):
-                sx3 = (sni*55 + tick//3) % card_w
-                sy3 = (sni*40 + tick//4) % (card_h-45)
-                for ang_s in [0,math.pi/3,2*math.pi/3]:
-                    dx_s = int(3*math.cos(ang_s))
-                    dy_s = int(3*math.sin(ang_s))
-                    pygame.draw.line(card,(200,220,255),(sx3-dx_s,sy3-dy_s),(sx3+dx_s,sy3+dy_s),1)
         elif name == "Cosmos":
-            # Stars
             for sni in range(15):
                 sx3 = (sni*37+13) % card_w
                 sy3 = (sni*23+7) % (card_h//2)
                 a_s = 0.4+0.6*math.sin(tick*0.04+sni)
                 gray = max(0, min(255, int(200*a_s)))
                 pygame.draw.circle(card,(gray,gray,min(255,200)),(sx3,sy3),1+(sni%2))
-            # Planet
             for pr2 in range(25,0,-3):
                 angle2 = pr2/25
                 pc2 = (int(30+50*angle2),int(10+30*angle2),int(80+80*angle2))
                 pygame.draw.circle(card,pc2,(card_w-50,50),pr2)
             pygame.draw.ellipse(card,(120,90,200),(card_w-80,45,60,12))
 
-        # Platform line on card
         plat_col2 = data["plat"]
         plat_top2 = data["plat_top"]
         pygame.draw.rect(card, plat_col2, (20, card_h-40, card_w-40, 10), border_radius=4)
@@ -1669,6 +1463,21 @@ def main():
         font_big   = pygame.font.Font(None, 52)
         font_small = pygame.font.Font(None, 28)
 
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    def load_bg(filename):
+        path = os.path.join(base_dir, "imagens", filename)
+        img = pygame.image.load(path).convert_alpha()
+        return pygame.transform.smoothscale(img, (WIDTH, HEIGHT))
+
+    bg_images = {
+        "Cosmos": load_bg("cosmos.png"),
+        "Vulcão": load_bg("vulcao.png"),
+        "Oceano": load_bg("oceano.png"),
+        "Floresta": load_bg("floresta.png"),
+        "Tundra": load_bg("tundra.png"),
+    }
+
     ctrl1 = {'left': pygame.K_a, 'right': pygame.K_d, 'jump': pygame.K_w,
               'light': pygame.K_f, 'heavy': pygame.K_g, 'dodge': pygame.K_s}
     ctrl2 = {'left': pygame.K_LEFT, 'right': pygame.K_RIGHT, 'jump': pygame.K_UP,
@@ -1717,15 +1526,12 @@ def main():
                 if event.key == pygame.K_ESCAPE:
                     running = False
 
-                # Intro
                 if state == "intro" and event.key == pygame.K_RETURN:
                     state = "char_select"
                     css["p1_ready"] = False
                     css["p2_ready"] = False
 
-                # Seleção de personagens
                 elif state == "char_select":
-                    # P1: A/D para navegar, ENTER para confirmar
                     if not css["p1_ready"]:
                         if event.key == pygame.K_a:
                             css["p1_idx"] = (css["p1_idx"] - 1) % len(CHARACTERS)
@@ -1735,9 +1541,8 @@ def main():
                             css["p1_ready"] = True
                     else:
                         if event.key == pygame.K_RETURN:
-                            css["p1_ready"] = False  # Desfaz
+                            css["p1_ready"] = False
 
-                    # P2: ←/→ para navegar, SPACE para confirmar
                     if not css["p2_ready"]:
                         if event.key == pygame.K_LEFT:
                             css["p2_idx"] = (css["p2_idx"] - 1) % len(CHARACTERS)
@@ -1747,9 +1552,8 @@ def main():
                             css["p2_ready"] = True
                     else:
                         if event.key == pygame.K_SPACE:
-                            css["p2_ready"] = False  # Desfaz
+                            css["p2_ready"] = False
 
-                # Seleção de paisagem
                 elif state == "landscape_select":
                     if event.key == pygame.K_LEFT:
                         selected_landscape_idx = (selected_landscape_idx - 1) % len(LANDSCAPE_NAMES)
@@ -1767,12 +1571,10 @@ def main():
                         css["p1_ready"] = False
                         css["p2_ready"] = False
 
-                # Jogo
                 elif state == "game":
                     p1.process_event(event)
                     p2.process_event(event)
 
-                # Vitória
                 elif state == "win":
                     if event.key == pygame.K_r:
                         p1, p2 = make_players()
@@ -1790,7 +1592,6 @@ def main():
                         global_particles.clear()
                         winner = None
 
-        # Auto-advance char select when both ready
         if state == "char_select":
             if css["p1_ready"] and css["p2_ready"]:
                 css_ready_timer += 1
@@ -1802,7 +1603,6 @@ def main():
             else:
                 css_ready_timer = 0
 
-        # Update
         if state == "game":
             keys = pygame.key.get_pressed()
             p1.handle_input(keys)
@@ -1849,7 +1649,6 @@ def main():
         elif state == "landscape_select":
             update_bg_particles(bg_particles, LANDSCAPE_NAMES[selected_landscape_idx], tick)
 
-        # Draw
         if state == "intro":
             draw_intro(surf, font_title, font_small)
 
@@ -1857,7 +1656,7 @@ def main():
             draw_character_select(surf, font_title, font_small, font_big, css, tick)
 
         elif state == "landscape_select":
-            draw_landscape_select(surf, font_title, font_small, font_big, selected_landscape_idx, tick)
+            draw_landscape_select(surf, font_title, font_small, font_big, selected_landscape_idx, tick, bg_images)
 
         elif state in ("game", "win"):
             draw_background(surf, current_landscape, bg_particles, tick)
