@@ -1,3 +1,4 @@
+
 import pygame
 import sys
 import math
@@ -37,8 +38,8 @@ C_P1_DARK = (30, 80, 180)
 C_P2      = (255, 60, 60)
 C_P2_DARK = (180, 30, 30)
 
-# ─── Sprites globais carregados na inicialização ───────────────────────────────
-SPRITE_CACHE = {}   # preenchido em load_sprites()
+# Sprites globais carregados na inicialização
+SPRITE_CACHE = {}
 
 
 def load_sprites(base_dir):
@@ -55,14 +56,12 @@ def load_sprites(base_dir):
         print(f"[SPRITE] Pasta não encontrada: {folder}")
         return False
 
-    # Aceita qualquer quantidade de frames run_XX.png
     run_files = [
         f for f in os.listdir(folder)
         if f.lower().startswith("run_") and f.lower().endswith(".png")
     ]
 
     def run_sort_key(name):
-        # Extrai o número do arquivo, por exemplo run_01.png -> 1
         digits = "".join(ch for ch in os.path.splitext(name)[0] if ch.isdigit())
         return int(digits) if digits else 10**9
 
@@ -93,7 +92,6 @@ def load_sprites(base_dir):
     return True
 
 
-# ─── Personagens ───────────────────────────────────────────────────────────────
 CHARACTERS = [
     {
         "name": "SOMBRA",
@@ -109,7 +107,7 @@ CHARACTERS = [
         "weight": 0.9,
         "light_dmg": 8, "heavy_dmg": 16, "light_kb": 9, "heavy_kb": 18,
         "accent": (210, 160, 255),
-        "use_sprite": True,   # usa spritesheet de Personagem1
+        "use_sprite": True,
     },
     {
         "name": "TITAN",
@@ -247,12 +245,9 @@ LANDSCAPES = {
 }
 
 LANDSCAPE_NAMES = list(LANDSCAPES.keys())
-
-# Tamanho de exibição do sprite no jogo (em pixels)
-SPRITE_DISPLAY_H = 80   # altura alvo; largura é calculada proporcionalmente
+SPRITE_DISPLAY_H = 80
 
 
-# ─── Utilitários de sprite ─────────────────────────────────────────────────────
 def scale_sprite(img, w, h):
     return pygame.transform.smoothscale(img, (w, h))
 
@@ -260,8 +255,6 @@ def scale_sprite(img, w, h):
 def flip_sprite(img):
     return pygame.transform.flip(img, True, False)
 
-
-# ─── Partículas ────────────────────────────────────────────────────────────────
 class Particle:
     def __init__(self, x, y, color, vx=None, vy=None, life=None, size=None):
         self.x = x
@@ -280,12 +273,20 @@ class Particle:
         self.life -= 1
 
     def draw(self, surf):
-        alpha = self.life / self.max_life
+        if self.life <= 0:
+            return  # evita cor inválida
+
+        alpha = max(0, self.life / self.max_life)
+
         r, g, b = self.color
-        col = (int(r * alpha), int(g * alpha), int(b * alpha))
+        col = (
+            clamp(r * alpha),
+            clamp(g * alpha),
+            clamp(b * alpha)
+        )
+
         s = max(1, int(self.size * alpha))
         pygame.draw.circle(surf, col, (int(self.x), int(self.y)), s)
-
 
 class HitEffect:
     def __init__(self, x, y, color):
@@ -304,52 +305,50 @@ class HitEffect:
         pygame.draw.circle(surf, C_WHITE, (int(self.x), int(self.y)), int(r * 0.5))
 
 
-# ─── Player ────────────────────────────────────────────────────────────────────
 class Player:
-    W, H = 36, 54   # hitbox lógica (não muda com sprite)
+    W, H = 36, 54
 
     def __init__(self, x, y, char_data, controls, player_num):
         self.x = float(x)
         self.y = float(y)
-        self.color         = char_data["color"]
-        self.dark_color    = char_data["dark_color"]
+        self.color = char_data["color"]
+        self.dark_color = char_data["dark_color"]
         self.special_color = char_data["special_color"]
-        self.controls      = controls
-        self.name          = char_data["name"]
-        self.player_num    = player_num
-        self.top_speed     = char_data["speed"]
-        self.jump_power    = char_data["jump_power"]
-        self.weight        = char_data["weight"]
-        self.light_dmg     = char_data["light_dmg"]
-        self.heavy_dmg     = char_data["heavy_dmg"]
-        self.light_kb      = char_data["light_kb"]
-        self.heavy_kb      = char_data["heavy_kb"]
+        self.controls = controls
+        self.name = char_data["name"]
+        self.player_num = player_num
+        self.top_speed = char_data["speed"]
+        self.jump_power = char_data["jump_power"]
+        self.weight = char_data["weight"]
+        self.light_dmg = char_data["light_dmg"]
+        self.heavy_dmg = char_data["heavy_dmg"]
+        self.light_kb = char_data["light_kb"]
+        self.heavy_kb = char_data["heavy_kb"]
 
-        # Controle de sprite
-        self.use_sprite        = char_data.get("use_sprite", False) and bool(SPRITE_CACHE)
-        self._walk_timer       = 0
-        self._walk_idx         = 0
-        self._walk_frame_speed = 6   # ticks por frame de caminhada
+        self.use_sprite = char_data.get("use_sprite", False) and bool(SPRITE_CACHE)
+        self._walk_timer = 0
+        self._walk_idx = 0
+        self._walk_frame_speed = 6
 
         self.vx = 0.0
         self.vy = 0.0
-        self.on_ground  = False
+        self.on_ground = False
         self.jumps_left = 2
-        self.facing     = 1
-        self.damage     = 0
-        self.stocks     = 3
-        self.attack_timer   = 0
-        self.attack_type    = None
-        self.attack_hitbox  = None
-        self.stun_timer     = 0
-        self.invincible     = 0
-        self.dodge_timer    = 0
-        self.dodge_cd       = 0
-        self.anim_frame     = 0
-        self.squash_y       = 1.0
-        self.squash_x       = 1.0
-        self.particles      = []
-        self.trail          = []
+        self.facing = 1
+        self.damage = 0
+        self.stocks = 3
+        self.attack_timer = 0
+        self.attack_type = None
+        self.attack_hitbox = None
+        self.stun_timer = 0
+        self.invincible = 0
+        self.dodge_timer = 0
+        self.dodge_cd = 0
+        self.anim_frame = 0
+        self.squash_y = 1.0
+        self.squash_x = 1.0
+        self.particles = []
+        self.trail = []
 
     @property
     def rect(self):
@@ -359,13 +358,13 @@ class Player:
         if self.stun_timer > 0 or self.dodge_timer > 0:
             return
 
-        left  = self.controls["left"]
+        left = self.controls["left"]
         right = self.controls["right"]
-        jump  = self.controls["jump"]
+        jump = self.controls["jump"]
         heavy = self.controls["heavy"]
         light = self.controls["light"]
         dodge = self.controls["dodge"]
-        acc   = 1.2
+        acc = 1.2
 
         if keys[left]:
             self.vx = max(self.vx - acc, -self.top_speed)
@@ -380,18 +379,18 @@ class Player:
             if self.on_ground:
                 self.vx = self.facing * 12
                 self.dodge_timer = 18
-                self.invincible  = 18
-                self.dodge_cd    = 35
+                self.invincible = 18
+                self.dodge_cd = 35
             elif self.jumps_left > 0:
-                dx  = 1 if keys[right] else -1 if keys[left] else self.facing
-                dy  = -1 if keys[jump] else 0
+                dx = 1 if keys[right] else -1 if keys[left] else self.facing
+                dy = -1 if keys[jump] else 0
                 mag = math.hypot(dx, dy) or 1
                 self.vx = dx / mag * 13
                 self.vy = dy / mag * 13
                 self.jumps_left -= 1
                 self.dodge_timer = 22
-                self.invincible  = 22
-                self.dodge_cd    = 35
+                self.invincible = 22
+                self.dodge_cd = 35
                 for _ in range(12):
                     self.particles.append(Particle(
                         self.x + self.W // 2, self.y + self.H // 2,
@@ -422,13 +421,13 @@ class Player:
                     self.color, life=12, vy=random.uniform(0, 2)))
 
     def _start_attack(self, atype):
-        self.attack_type  = atype
+        self.attack_type = atype
         self.attack_timer = 18 if atype == "light" else 28
-        w, h  = (55, 40) if atype == "light" else (75, 55)
-        kb    = self.light_kb  if atype == "light" else self.heavy_kb
-        dmg   = self.light_dmg if atype == "light" else self.heavy_dmg
-        hx    = self.x + self.W + 2 if self.facing == 1 else self.x - w - 2
-        hy    = self.y + 5
+        w, h = (55, 40) if atype == "light" else (75, 55)
+        kb = self.light_kb if atype == "light" else self.heavy_kb
+        dmg = self.light_dmg if atype == "light" else self.heavy_dmg
+        hx = self.x + self.W + 2 if self.facing == 1 else self.x - w - 2
+        hy = self.y + 5
         self.attack_hitbox = {
             "rect": pygame.Rect(int(hx), int(hy), w, h),
             "type": atype, "knockback": kb, "active": True, "damage": dmg,
@@ -450,12 +449,16 @@ class Player:
             self.attack_timer -= 1
             if self.attack_timer == 0:
                 self.attack_hitbox = None
-                self.attack_type   = None
+                self.attack_type = None
 
-        if self.stun_timer  > 0: self.stun_timer  -= 1
-        if self.invincible  > 0: self.invincible  -= 1
-        if self.dodge_timer > 0: self.dodge_timer -= 1
-        if self.dodge_cd    > 0: self.dodge_cd    -= 1
+        if self.stun_timer > 0:
+            self.stun_timer -= 1
+        if self.invincible > 0:
+            self.invincible -= 1
+        if self.dodge_timer > 0:
+            self.dodge_timer -= 1
+        if self.dodge_cd > 0:
+            self.dodge_cd -= 1
 
         gravity = GRAVITY * self.weight
         self.vy = min(self.vy + gravity, MAX_FALL)
@@ -463,12 +466,9 @@ class Player:
         self.y += self.vy
 
         prev_on = self.on_ground
-        prev_x = self.x - self.vx
         prev_y = self.y - self.vy
         self.on_ground = False
 
-        # Colisão com o topo da plataforma usando a posição anterior.
-        # Isso evita o efeito de "tremer" quando o personagem fica parado em cima dela.
         if self.vy >= 0:
             current_bottom = self.y + self.H
             prev_bottom = prev_y + self.H
@@ -481,13 +481,11 @@ class Player:
                     self.vy = 0
                     self.on_ground = True
                     self.jumps_left = 2
-                    # Só aplica o squash quando realmente aterrissa do ar.
                     if not prev_on:
                         self.squash_y = 0.6
                         self.squash_x = 1.4
                     break
 
-        # Garante que, quando estiver parado no chão, a posição fique estável.
         if self.on_ground:
             self.vy = 0
             self.x = round(self.x)
@@ -500,7 +498,6 @@ class Player:
         if len(self.trail) > 8:
             self.trail.pop(0)
 
-        # Avança frame de caminhada do sprite
         if self.use_sprite:
             if abs(self.vx) > 0.8:
                 self._walk_timer += 1
@@ -517,9 +514,7 @@ class Player:
 
         self.anim_frame = (self.anim_frame + 1) % 60
 
-    # ── Desenho ────────────────────────────────────────────────────────────────
     def draw(self, surf):
-        # Trail de dodge
         if self.dodge_timer > 0:
             for i, (tx, ty) in enumerate(self.trail):
                 alpha = i / max(len(self.trail), 1)
@@ -532,7 +527,6 @@ class Player:
         for p in self.particles:
             p.draw(surf)
 
-        # Pisca durante invencibilidade
         if self.invincible > 0 and self.invincible % 4 < 2:
             return
 
@@ -541,7 +535,6 @@ class Player:
         else:
             self._draw_shape(surf)
 
-        # Hitbox de ataque (visual)
         if self.attack_hitbox and self.attack_timer > 5:
             color = C_YELLOW if self.attack_type == "light" else C_ORANGE
             s = pygame.Surface(
@@ -552,33 +545,23 @@ class Player:
             pygame.draw.rect(surf, color, self.attack_hitbox["rect"], 2, border_radius=6)
 
     def _draw_sprite(self, surf):
-        """Desenha usando as imagens PNG da pasta Personagem1."""
-        # Idle no card de seleção e frame de caminhada no jogo quando houver movimento.
         is_moving = abs(self.vx) > 0.8
-        if is_moving:
-            raw = SPRITE_CACHE["p1_walk"][self._walk_idx]
-        else:
-            raw = SPRITE_CACHE["p1_idle"]
+        raw = SPRITE_CACHE["p1_walk"][self._walk_idx] if is_moving else SPRITE_CACHE["p1_idle"]
 
-        # Escala proporcional pela altura alvo
         orig_w, orig_h = raw.get_size()
         tgt_h = SPRITE_DISPLAY_H
         tgt_w = max(1, int(orig_w * tgt_h / orig_h))
 
-        # Aplica squash/stretch
         sq_w = max(1, int(tgt_w * self.squash_x))
         sq_h = max(1, int(tgt_h * self.squash_y))
         scaled = scale_sprite(raw, sq_w, sq_h)
 
-        # Espelha quando vai para a esquerda
         if self.facing == -1:
             scaled = flip_sprite(scaled)
 
-        # Posiciona: base do sprite alinhada com base da hitbox, centralizado
         draw_x = int(self.x + self.W / 2 - sq_w / 2)
         draw_y = int(self.y + self.H - sq_h)
 
-        # Glow de ataque atrás do sprite
         if self.attack_timer > 5:
             glow = pygame.Surface((sq_w, sq_h), pygame.SRCALPHA)
             sc = self.special_color
@@ -588,10 +571,9 @@ class Player:
         surf.blit(scaled, (draw_x, draw_y))
 
     def _draw_shape(self, surf):
-        """Desenha o personagem com formas geométricas (para chars sem sprite)."""
         sx, sy = self.squash_x, self.squash_y
-        w  = int(self.W * sx)
-        h  = int(self.H * sy)
+        w = int(self.W * sx)
+        h = int(self.H * sy)
         bx = int(self.x + self.W // 2 - w // 2)
         by = int(self.y + self.H - h)
 
@@ -606,7 +588,7 @@ class Player:
         eye_y = by + h // 3
         e_off = 7 if self.facing == 1 else -7
         pygame.draw.circle(surf, C_WHITE, (bx + w // 2 + e_off, eye_y), 5)
-        pygame.draw.circle(surf, C_DARK,  (bx + w // 2 + e_off + self.facing, eye_y), 3)
+        pygame.draw.circle(surf, C_DARK, (bx + w // 2 + e_off + self.facing, eye_y), 3)
 
         arm_swing = math.sin(self.anim_frame * 0.15) * 8 if abs(self.vx) > 0.5 else 0
         arm_color = sc if self.attack_timer > 0 else self.dark_color
@@ -627,21 +609,20 @@ class Player:
         return self.x < DEATH_ZONE_X[0] or self.x > DEATH_ZONE_X[1] or self.y > DEATH_ZONE_Y
 
     def respawn(self, x, y):
-        self.x, self.y  = float(x), float(y)
+        self.x, self.y = float(x), float(y)
         self.vx = self.vy = 0
-        self.attack_timer  = 0
+        self.attack_timer = 0
         self.attack_hitbox = None
-        self.stun_timer    = 0
-        self.invincible    = 90
-        self.dodge_timer   = 0
-        self.damage        = 0
-        self._walk_timer   = 0
-        self._walk_idx     = 0
+        self.stun_timer = 0
+        self.invincible = 90
+        self.dodge_timer = 0
+        self.damage = 0
+        self._walk_timer = 0
+        self._walk_idx = 0
         self.particles.clear()
         self.trail.clear()
 
 
-# ─── HUD ───────────────────────────────────────────────────────────────────────
 def draw_hud(surf, p1, p2, font_big, font_small):
     pygame.draw.rect(surf, C_DARK, (0, HEIGHT - 90, WIDTH, 90))
     pygame.draw.line(surf, (120, 90, 200), (0, HEIGHT - 90), (WIDTH, HEIGHT - 90), 2)
@@ -656,9 +637,12 @@ def draw_hud(surf, p1, p2, font_big, font_small):
         pygame.draw.circle(surf, C_WHITE, (WIDTH - 120 - i * 28, HEIGHT - 30), 10, 2)
 
     def dmg_color(d):
-        if d < 50:  return C_WHITE
-        if d < 100: return C_YELLOW
-        if d < 150: return C_ORANGE
+        if d < 50:
+            return C_WHITE
+        if d < 100:
+            return C_YELLOW
+        if d < 150:
+            return C_ORANGE
         return C_RED
 
     t1 = font_big.render(f"{p1.damage}%", True, dmg_color(p1.damage))
@@ -678,36 +662,29 @@ def draw_hud(surf, p1, p2, font_big, font_small):
     ratio = p1.damage / max(1, p1.damage + p2.damage + 0.001)
     pygame.draw.rect(surf, p1.color, (cx, cy, int(cw * ratio), 14), border_radius=7)
     pygame.draw.rect(surf, p2.color, (cx + int(cw * ratio), cy, cw - int(cw * ratio), 14), border_radius=7)
-    pygame.draw.rect(surf, C_WHITE,  (cx, cy, cw, 14), 2, border_radius=7)
+    pygame.draw.rect(surf, C_WHITE, (cx, cy, cw, 14), 2, border_radius=7)
 
 
-# ─── Background / plataformas ──────────────────────────────────────────────────
 def draw_background(surf, landscape_name, bg_images):
     surf.blit(bg_images[landscape_name], (0, 0))
 
 
 def draw_platforms(surf, platforms, landscape_name):
-    data   = LANDSCAPES[landscape_name]
+    data = LANDSCAPES[landscape_name]
     c_plat = data["plat"]
-    c_top  = data["plat_top"]
+    c_top = data["plat_top"]
     c_edge = data["plat_edge"]
     c_shad = data["plat_shadow"]
     for px, py, pw, ph in platforms:
         pygame.draw.rect(surf, c_shad, (px + 4, py + 4, pw, ph + 8), border_radius=8)
         pygame.draw.rect(surf, c_plat, (px, py, pw, ph + 8), border_radius=8)
-        pygame.draw.rect(surf, c_top,  (px + 4, py, pw - 8, 6), border_radius=4)
+        pygame.draw.rect(surf, c_top, (px + 4, py, pw - 8, 6), border_radius=4)
         pygame.draw.rect(surf, c_edge, (px, py, pw, ph + 8), 2, border_radius=8)
 
 
-# ─── Tela de seleção de personagem ────────────────────────────────────────────
 def _draw_char_preview(surf, char, card_cx, card_top_y, hover_off, card_w, card_h, tick, i, is_sel):
-    """
-    Renderiza a prévia do personagem dentro do card.
-    Se use_sprite=True e sprites disponíveis: usa idle_01.png.
-    Caso contrário: boneco geométrico animado (comportamento original).
-    """
     pcx = card_cx + card_w // 2
-    pcy = card_top_y - hover_off + card_h // 2 - 20   # centro vertical do card
+    pcy = card_top_y - hover_off + card_h // 2 - 20
 
     if char.get("use_sprite") and SPRITE_CACHE:
         idle = SPRITE_CACHE["p1_idle"]
@@ -718,15 +695,13 @@ def _draw_char_preview(surf, char, card_cx, card_top_y, hover_off, card_w, card_
 
         bob = int(math.sin(tick * 0.06 + i) * (5 if is_sel else 2))
 
-        # Glow sutil quando selecionado
         if is_sel:
             glow = pygame.Surface((tgt_w + 20, tgt_h + 20), pygame.SRCALPHA)
-            ac   = char["accent"]
+            ac = char["accent"]
             pygame.draw.ellipse(glow, (*ac, 55), (0, 0, tgt_w + 20, tgt_h + 20))
             surf.blit(glow, (pcx - tgt_w // 2 - 10, pcy - tgt_h // 2 - 10 + bob))
 
         surf.blit(scaled, (pcx - tgt_w // 2, pcy - tgt_h // 2 + bob))
-
     else:
         bounce = int(math.sin(tick * 0.06 + i) * (5 if is_sel else 3))
         cw2, ch2 = 38, 56
@@ -734,13 +709,13 @@ def _draw_char_preview(surf, char, card_cx, card_top_y, hover_off, card_w, card_
         by2 = pcy - ch2 // 2 + bounce
 
         body_r = pygame.Rect(bx2, by2, cw2, ch2)
-        pygame.draw.rect(surf, char["dark_color"],    body_r, border_radius=10)
-        pygame.draw.rect(surf, char["color"],         body_r.inflate(-6, -6), border_radius=8)
+        pygame.draw.rect(surf, char["dark_color"], body_r, border_radius=10)
+        pygame.draw.rect(surf, char["color"], body_r.inflate(-6, -6), border_radius=8)
         pygame.draw.rect(surf, char["special_color"], (bx2 + 4, by2 + 4, cw2 - 8, 4), border_radius=2)
 
         eye_y = by2 + ch2 // 3
         pygame.draw.circle(surf, C_WHITE, (bx2 + cw2 // 2 + 8, eye_y), 5)
-        pygame.draw.circle(surf, C_DARK,  (bx2 + cw2 // 2 + 9, eye_y), 3)
+        pygame.draw.circle(surf, C_DARK, (bx2 + cw2 // 2 + 9, eye_y), 3)
 
         arm_s = int(math.sin(tick * 0.07 + i) * 6)
         pygame.draw.line(surf, char["dark_color"],
@@ -757,20 +732,19 @@ def _draw_char_preview(surf, char, card_cx, card_top_y, hover_off, card_w, card_
 
 
 def draw_character_select(surf, font_title, font_small, font_big, css, tick):
-    # Fundo escuro
     for y in range(HEIGHT):
         t = y / HEIGHT
         pygame.draw.line(surf,
-                         (int(5*(1-t)+15*t), int(5*(1-t)+10*t), int(20*(1-t)+40*t)),
+                         (int(5 * (1 - t) + 15 * t), int(5 * (1 - t) + 10 * t), int(20 * (1 - t) + 40 * t)),
                          (0, y), (WIDTH, y))
 
     title = font_title.render("ESCOLHA SEU LUTADOR", True, C_YELLOW)
     surf.blit(title, (WIDTH // 2 - title.get_width() // 2, 18))
 
     n = len(CHARACTERS)
-    card_w  = 185
-    card_h  = 310
-    gap     = 14
+    card_w = 185
+    card_h = 310
+    gap = 14
     total_w = n * card_w + (n - 1) * gap
     start_x = WIDTH // 2 - total_w // 2
 
@@ -782,60 +756,52 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         is_sel = p1_sel or p2_sel
         hover_off = 6 if is_sel else 0
 
-        # Sombra
         shad = pygame.Surface((card_w + 8, card_h + 8), pygame.SRCALPHA)
         shad.fill((0, 0, 0, 80))
         surf.blit(shad, (cx - 2, cy + 8 - hover_off))
 
-        # Card com gradiente tintado
         card = pygame.Surface((card_w, card_h))
         for row in range(card_h):
             t2 = row / card_h
-            br = int((20*(1-t2)+35*t2) * 0.85 + char["color"][0] * 0.15)
-            bg = int((15*(1-t2)+25*t2) * 0.85 + char["color"][1] * 0.15)
-            bb = int((45*(1-t2)+70*t2) * 0.85 + char["color"][2] * 0.15)
+            br = int((20 * (1 - t2) + 35 * t2) * 0.85 + char["color"][0] * 0.15)
+            bg = int((15 * (1 - t2) + 25 * t2) * 0.85 + char["color"][1] * 0.15)
+            bb = int((45 * (1 - t2) + 70 * t2) * 0.85 + char["color"][2] * 0.15)
             pygame.draw.line(card, (clamp(br), clamp(bg), clamp(bb)), (0, row), (card_w, row))
         surf.blit(card, (cx, cy - hover_off))
 
-        # Prévia (sprite ou geométrico)
         _draw_char_preview(surf, char, cx, cy, hover_off, card_w, card_h, tick, i, is_sel)
 
-        # Nome
-        name_col  = char["accent"] if is_sel else C_WHITE
+        name_col = char["accent"] if is_sel else C_WHITE
         name_surf = font_small.render(char["name"], True, name_col)
         surf.blit(name_surf, (cx + card_w // 2 - name_surf.get_width() // 2,
                                cy - hover_off + card_h - 110))
 
-        # Descrição
         desc_s = font_small.render(char["desc"], True, (170, 160, 200))
         surf.blit(desc_s, (cx + card_w // 2 - desc_s.get_width() // 2,
                             cy - hover_off + card_h - 90))
 
-        # Habilidade especial
-        abil_s  = font_small.render(char["ability"], True, char["special_color"])
+        abil_s = font_small.render(char["ability"], True, char["special_color"])
         abil_bg = pygame.Surface((abil_s.get_width() + 14, abil_s.get_height() + 6), pygame.SRCALPHA)
         abil_bg.fill((*char["special_color"], 40))
         surf.blit(abil_bg, (cx + card_w // 2 - abil_s.get_width() // 2 - 7,
                              cy - hover_off + card_h - 68))
-        surf.blit(abil_s,  (cx + card_w // 2 - abil_s.get_width() // 2,
+        surf.blit(abil_s, (cx + card_w // 2 - abil_s.get_width() // 2,
                              cy - hover_off + card_h - 65))
 
-        # Barras de stats
         stat_labels = ["FOR", "VEL", "PUL", "DEF"]
-        stat_keys   = ["força", "velocidade", "pulo", "defesa"]
+        stat_keys = ["força", "velocidade", "pulo", "defesa"]
         bar_y = cy - hover_off + card_h - 50
         for si, (sl, sk) in enumerate(zip(stat_labels, stat_keys)):
-            val  = char["stats"][sk]
-            lbl  = font_small.render(sl, True, (180, 170, 210))
+            val = char["stats"][sk]
+            lbl = font_small.render(sl, True, (180, 170, 210))
             surf.blit(lbl, (cx + 8, bar_y + si * 13 - 2))
-            bx2  = cx + 42
-            bw2  = card_w - 52
+            bx2 = cx + 42
+            bw2 = card_w - 52
             pygame.draw.rect(surf, C_HP_BG, (bx2, bar_y + si * 13, bw2, 7), border_radius=4)
-            fw   = int(bw2 * val / 10)
-            bc   = char["accent"] if is_sel else (100, 90, 130)
+            fw = int(bw2 * val / 10)
+            bc = char["accent"] if is_sel else (100, 90, 130)
             pygame.draw.rect(surf, bc, (bx2, bar_y + si * 13, fw, 7), border_radius=4)
 
-        # Bordas de seleção
         if p1_sel and p2_sel:
             pygame.draw.rect(surf, C_P1, (cx, cy - hover_off, card_w // 2, card_h), 3, border_radius=8)
             pygame.draw.rect(surf, C_P2, (cx + card_w // 2, cy - hover_off, card_w // 2, card_h), 3, border_radius=8)
@@ -850,22 +816,19 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         else:
             pygame.draw.rect(surf, (60, 55, 90), (cx, cy - hover_off, card_w, card_h), 1, border_radius=8)
 
-        # Badges PRONTO
         for psel, pready, pcol, yoff in [
             (p1_sel, css["p1_ready"], C_P1, -38),
             (p2_sel, css["p2_ready"], C_P2, -20),
         ]:
             if psel and pready:
-                lbl_p = font_small.render(
-                    "P1 PRONTO!" if pcol == C_P1 else "P2 PRONTO!", True, pcol)
-                bg_p  = pygame.Surface((lbl_p.get_width() + 10, lbl_p.get_height() + 4), pygame.SRCALPHA)
+                lbl_p = font_small.render("P1 PRONTO!" if pcol == C_P1 else "P2 PRONTO!", True, pcol)
+                bg_p = pygame.Surface((lbl_p.get_width() + 10, lbl_p.get_height() + 4), pygame.SRCALPHA)
                 bg_p.fill((*pcol, 80))
                 surf.blit(bg_p, (cx + card_w // 2 - lbl_p.get_width() // 2 - 5,
                                   cy - hover_off + card_h + yoff))
                 surf.blit(lbl_p, (cx + card_w // 2 - lbl_p.get_width() // 2,
                                    cy - hover_off + card_h + yoff + 2))
 
-        # Setas P1 / P2
         if p1_sel:
             off = -16 if p2_sel else 0
             surf.blit(font_small.render("P1", True, C_P1),
@@ -879,7 +842,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
             surf.blit(font_big.render("▼", True, C_P2),
                       (cx + card_w // 2 - font_big.size("▼")[0] // 2 + off, cy - hover_off - 46))
 
-    # Painéis inferiores
     p1c = CHARACTERS[css["p1_idx"]]
     p2c = CHARACTERS[css["p2_idx"]]
 
@@ -909,7 +871,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         surf.blit(hint, (WIDTH // 2 - hint.get_width() // 2, HEIGHT - 40))
 
 
-# ─── Telas intro / arena / vitória ────────────────────────────────────────────
 def draw_intro(surf, font_title, font_small):
     surf.fill(C_DARK)
     title = font_title.render("BRAWL CLONE", True, C_YELLOW)
@@ -950,15 +911,15 @@ def draw_landscape_select(surf, font_title, font_small, font_big,
 
     n = len(LANDSCAPE_NAMES)
     card_w, card_h = 210, 240
-    gap     = 20
+    gap = 20
     total_w = n * card_w + (n - 1) * gap
     start_x = WIDTH // 2 - total_w // 2
 
     for i, lname in enumerate(LANDSCAPE_NAMES):
         data = LANDSCAPES[lname]
-        cx   = start_x + i * (card_w + gap)
-        cy   = 120
-        is_sel   = i == selected_idx
+        cx = start_x + i * (card_w + gap)
+        cy = 120
+        is_sel = i == selected_idx
         hover_off = int(math.sin(tick * 0.05) * 5) if is_sel else 0
 
         shadow = pygame.Surface((card_w + 10, card_h + 10), pygame.SRCALPHA)
@@ -970,7 +931,7 @@ def draw_landscape_select(surf, font_title, font_small, font_big,
         pygame.draw.rect(surf, border_col, (cx, cy - hover_off, card_w, card_h),
                          3 if is_sel else 1, border_radius=8)
 
-        name_col  = data["accent"] if is_sel else C_WHITE
+        name_col = data["accent"] if is_sel else C_WHITE
         name_surf = font_small.render(lname, True, name_col)
         surf.blit(name_surf, (cx + card_w // 2 - name_surf.get_width() // 2,
                                cy - hover_off + card_h - 48))
@@ -989,45 +950,48 @@ def draw_winner(surf, winner, font_title, font_small, win_particles):
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 160))
     surf.blit(overlay, (0, 0))
+
+    # REMOVE partículas mortas antes de desenhar
+    win_particles[:] = [p for p in win_particles if p.life > 0]
+
     for p in win_particles:
         p.update()
         p.draw(surf)
+
     txt = font_title.render(f"{winner} VENCEU!", True, C_YELLOW)
     surf.blit(txt, (WIDTH // 2 - txt.get_width() // 2, HEIGHT // 2 - 60))
+
     sub = font_small.render(
-        "R = reiniciar mesmo mapa   |   M = menu de personagens   |   ESC = sair",
-        True, C_WHITE)
+        "R = reiniciar | M = menu | ESC = sair",
+        True, C_WHITE
+    )
     surf.blit(sub, (WIDTH // 2 - sub.get_width() // 2, HEIGHT // 2 + 20))
 
 
-# ─── Main ──────────────────────────────────────────────────────────────────────
 def main():
     pygame.init()
-    surf  = pygame.display.set_mode((WIDTH, HEIGHT))
+    surf = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Brawl Clone")
     clock = pygame.time.Clock()
 
     try:
         font_title = pygame.font.SysFont("Arial Black", 64, bold=True)
-        font_big   = pygame.font.SysFont("Arial Black", 44, bold=True)
+        font_big = pygame.font.SysFont("Arial Black", 44, bold=True)
         font_small = pygame.font.SysFont("Arial", 22)
     except Exception:
         font_title = pygame.font.Font(None, 72)
-        font_big   = pygame.font.Font(None, 52)
+        font_big = pygame.font.Font(None, 52)
         font_small = pygame.font.Font(None, 28)
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Carrega sprites de Personagem1
     sprites_ok = load_sprites(base_dir)
     if not sprites_ok:
-        print("[AVISO] Sprites de Personagem1 não encontrados — "
-              "SOMBRA usará visual geométrico como fallback.")
+        print("[AVISO] Sprites de Personagem1 não encontrados — SOMBRA usará visual geométrico como fallback.")
         for c in CHARACTERS:
             if c.get("use_sprite"):
                 c["use_sprite"] = False
 
-    # Carrega fundos
     def load_bg(filename):
         path = os.path.join(base_dir, "imagens", filename)
         if not os.path.exists(path):
@@ -1036,11 +1000,11 @@ def main():
         return pygame.transform.smoothscale(img, (WIDTH, HEIGHT))
 
     bg_images = {
-        "Cosmos":   load_bg("ilhadoceu.png"),
-        "Vulcão":   load_bg("inferno.png"),
-        "Oceano":   load_bg("oriental.png"),
+        "Cosmos": load_bg("ilhadoceu.png"),
+        "Vulcão": load_bg("inferno.png"),
+        "Oceano": load_bg("oriental.png"),
         "Floresta": load_bg("floresta.png"),
-        "Tundra":   load_bg("reinocongelante.png"),
+        "Tundra": load_bg("reinocongelante.png"),
     }
 
     card_w, card_h = 210, 240
@@ -1050,9 +1014,9 @@ def main():
     }
 
     ctrl1 = {"left": pygame.K_a, "right": pygame.K_d, "jump": pygame.K_w,
-              "light": pygame.K_f, "heavy": pygame.K_g, "dodge": pygame.K_s}
+             "light": pygame.K_f, "heavy": pygame.K_g, "dodge": pygame.K_s}
     ctrl2 = {"left": pygame.K_LEFT, "right": pygame.K_RIGHT, "jump": pygame.K_UP,
-              "light": pygame.K_l, "heavy": pygame.K_k, "dodge": pygame.K_DOWN}
+             "light": pygame.K_l, "heavy": pygame.K_k, "dodge": pygame.K_DOWN}
 
     css = {"p1_idx": 0, "p2_idx": 1, "p1_ready": False, "p2_ready": False}
     css_ready_timer = 0
@@ -1065,13 +1029,13 @@ def main():
     selected_landscape_idx = 0
     current_landscape = LANDSCAPE_NAMES[0]
 
-    p1, p2   = make_players()
-    effects  = []
+    p1, p2 = make_players()
+    effects = []
     global_particles = []
-    state    = "intro"
-    winner   = None
+    state = "intro"
+    winner = None
     win_particles = []
-    tick     = 0
+    tick = 0
 
     def spawn_win_particles(color):
         return [Particle(
@@ -1079,6 +1043,23 @@ def main():
             color, random.uniform(-3, 3), random.uniform(-1, 4),
             random.randint(60, 120), random.randint(4, 10))
             for _ in range(120)]
+
+    def reset_to_char_select():
+        nonlocal state, css_ready_timer, winner
+        state = "char_select"
+        css["p1_ready"] = False
+        css["p2_ready"] = False
+        css_ready_timer = 0
+        winner = None
+
+    def reset_match():
+        nonlocal p1, p2, effects, global_particles, win_particles, winner, state
+        p1, p2 = make_players()
+        effects.clear()
+        global_particles.clear()
+        win_particles.clear()
+        winner = None
+        state = "game"
 
     running = True
     while running:
@@ -1091,12 +1072,16 @@ def main():
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    if state == "win":
+                        reset_to_char_select()
+                    else:
+                        running = False
 
                 if state == "intro" and event.key == pygame.K_RETURN:
                     state = "char_select"
                     css["p1_ready"] = False
                     css["p2_ready"] = False
+                    css_ready_timer = 0
 
                 elif state == "char_select":
                     if not css["p1_ready"]:
@@ -1128,14 +1113,9 @@ def main():
                         selected_landscape_idx = (selected_landscape_idx + 1) % len(LANDSCAPE_NAMES)
                     elif event.key == pygame.K_RETURN:
                         current_landscape = LANDSCAPE_NAMES[selected_landscape_idx]
-                        p1, p2 = make_players()
-                        effects.clear()
-                        global_particles.clear()
-                        state = "game"
+                        reset_match()
                     elif event.key == pygame.K_m:
-                        state = "char_select"
-                        css["p1_ready"] = False
-                        css["p2_ready"] = False
+                        reset_to_char_select()
 
                 elif state == "game":
                     p1.process_event(event)
@@ -1143,22 +1123,10 @@ def main():
 
                 elif state == "win":
                     if event.key == pygame.K_r:
-                        p1, p2 = make_players()
-                        effects.clear()
-                        global_particles.clear()
-                        win_particles.clear()
-                        winner = None
-                        state  = "game"
+                        reset_match()
                     elif event.key == pygame.K_m:
-                        state = "char_select"
-                        css["p1_ready"] = False
-                        css["p2_ready"] = False
-                        win_particles.clear()
-                        effects.clear()
-                        global_particles.clear()
-                        winner = None
+                        reset_to_char_select()
 
-        # Updates
         if state == "char_select":
             if css["p1_ready"] and css["p2_ready"]:
                 css_ready_timer += 1
@@ -1180,16 +1148,16 @@ def main():
                 hb = attacker.attack_hitbox
                 if hb and hb["active"]:
                     if hb["rect"].colliderect(defender.rect):
-                        dx    = defender.x - attacker.x
+                        dx = defender.x - attacker.x
                         dir_x = 1 if dx > 0 else -1
-                        hit   = defender.apply_knockback(
+                        hit = defender.apply_knockback(
                             dir_x * hb["knockback"] * 0.7,
                             -hb["knockback"] * 0.5,
                             hb["damage"])
                         if hit:
                             hb["active"] = False
-                            ex  = int((defender.x + attacker.x + attacker.W) // 2)
-                            ey  = int((defender.y + attacker.y + attacker.H) // 2)
+                            ex = int((defender.x + attacker.x + attacker.W) // 2)
+                            ey = int((defender.y + attacker.y + attacker.H) // 2)
                             col = C_YELLOW if hb["type"] == "light" else C_ORANGE
                             effects.append(HitEffect(ex, ey, col))
                             for _ in range(16):
@@ -1200,17 +1168,18 @@ def main():
                     player.stocks -= 1
                     if player.stocks <= 0:
                         winner = other.name
-                        state  = "win"
+                        state = "win"
                         win_particles = spawn_win_particles(other.color)
                     else:
                         player.respawn(WIDTH // 2, 200)
 
-            for e in effects: e.update()
+            for e in effects:
+                e.update()
             effects = [e for e in effects if e.life > 0]
-            for pg in global_particles: pg.update()
+            for pg in global_particles:
+                pg.update()
             global_particles = [pg for pg in global_particles if pg.life > 0]
 
-        # Render
         if state == "intro":
             draw_intro(surf, font_title, font_small)
         elif state == "char_select":
@@ -1226,8 +1195,10 @@ def main():
             pygame.draw.rect(surf, bar_col, (WIDTH - 6, 0, 6, HEIGHT))
             p1.draw(surf)
             p2.draw(surf)
-            for e in effects:  e.draw(surf)
-            for pg in global_particles: pg.draw(surf)
+            for e in effects:
+                e.draw(surf)
+            for pg in global_particles:
+                pg.draw(surf)
             draw_hud(surf, p1, p2, font_big, font_small)
             if state == "win":
                 draw_winner(surf, winner, font_title, font_small, win_particles)
