@@ -1,4 +1,3 @@
-
 import pygame
 import sys
 import math
@@ -38,18 +37,10 @@ C_P1_DARK = (30, 80, 180)
 C_P2      = (255, 60, 60)
 C_P2_DARK = (180, 30, 30)
 
-# Sprites globais carregados na inicialização
 SPRITE_CACHE = {}
 
 
 def load_sprites(base_dir):
-    """
-    Carrega os sprites de Personagem1 de forma flexível.
-    - Procura automaticamente todos os arquivos run_*.png
-    - Carrega idle_01.png para prévia e estado parado
-    Retorna True se houver ao menos 1 frame de caminhada e o idle.
-    Armazena em SPRITE_CACHE["p1_walk"], SPRITE_CACHE["p1_idle"].
-    """
     folder = os.path.join(base_dir, "Personagem1")
 
     if not os.path.isdir(folder):
@@ -255,6 +246,7 @@ def scale_sprite(img, w, h):
 def flip_sprite(img):
     return pygame.transform.flip(img, True, False)
 
+
 class Particle:
     def __init__(self, x, y, color, vx=None, vy=None, life=None, size=None):
         self.x = x
@@ -274,19 +266,17 @@ class Particle:
 
     def draw(self, surf):
         if self.life <= 0:
-            return  # evita cor inválida
-
+            return
         alpha = max(0, self.life / self.max_life)
-
         r, g, b = self.color
         col = (
             clamp(r * alpha),
             clamp(g * alpha),
             clamp(b * alpha)
         )
-
         s = max(1, int(self.size * alpha))
         pygame.draw.circle(surf, col, (int(self.x), int(self.y)), s)
+
 
 class HitEffect:
     def __init__(self, x, y, color):
@@ -871,32 +861,175 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         surf.blit(hint, (WIDTH // 2 - hint.get_width() // 2, HEIGHT - 40))
 
 
-def draw_intro(surf, font_title, font_small):
-    surf.fill(C_DARK)
-    title = font_title.render("BRAWL CLONE", True, C_YELLOW)
-    surf.blit(title, (WIDTH // 2 - title.get_width() // 2, 60))
-    lines = [
-        ("JOGADOR 1 (AZUL)", C_P1),
-        ("  Mover: A / D", C_WHITE),
-        ("  Pular: W  (2x = double jump)", C_WHITE),
-        ("  Ataque Leve: F", C_WHITE),
-        ("  Ataque Forte: G", C_WHITE),
-        ("  Dodge / Air Dash: S", C_WHITE),
-        ("", C_WHITE),
-        ("JOGADOR 2 (VERMELHO)", C_P2),
-        ("  Mover: Seta Esq / Dir", C_WHITE),
-        ("  Pular: Seta Cima  (2x = double jump)", C_WHITE),
-        ("  Ataque Leve: L", C_WHITE),
-        ("  Ataque Forte: K", C_WHITE),
-        ("  Dodge / Air Dash: Seta Baixo", C_WHITE),
+# ─── NOVA TELA: TELA INICIAL COM capa.png ────────────────────────────────────
+def get_jogar_button_rect():
+    """
+    Retorna o pygame.Rect do botão JOGAR mapeado para a resolução 1280x720.
+    Na imagem original (2560x1440) o botão fica em ~(230,490)-(590,565).
+    Escala: 1280/2560 = 0.5 e 720/1440 = 0.5
+    """
+    # Coordenadas na imagem original 2560x1440, escaladas para 1280x720
+    x = int(230 * 1280 / 2560)
+    y = int(482 * 720 / 1440)
+    w = int(360 * 1280 / 2560)
+    h = int(88  * 720 / 1440)
+    return pygame.Rect(x, y, w, h)
+
+
+def draw_intro(surf, font_small, capa_img, tick, jogar_btn_rect):
+    """
+    Nova tela inicial: exibe capa.png em tela cheia.
+    Desenha um leve efeito de hover/pulse sobre a área do botão JOGAR.
+    """
+    surf.blit(capa_img, (0, 0))
+
+    # Efeito de brilho pulsante sobre o botão para indicar que é clicável
+    mouse_pos = pygame.mouse.get_pos()
+    hovering = jogar_btn_rect.collidepoint(mouse_pos)
+
+    pulse = 0.4 + 0.35 * math.sin(tick * 0.08)
+    alpha = int(pulse * 80) if not hovering else 120
+    glow_surf = pygame.Surface((jogar_btn_rect.w + 20, jogar_btn_rect.h + 20), pygame.SRCALPHA)
+    glow_col = (255, 220, 50, alpha)
+    pygame.draw.rect(glow_surf, glow_col,
+                     (0, 0, jogar_btn_rect.w + 20, jogar_btn_rect.h + 20),
+                     border_radius=30)
+    surf.blit(glow_surf, (jogar_btn_rect.x - 10, jogar_btn_rect.y - 10))
+
+    if hovering:
+        # Contorno branco quando hover
+        pygame.draw.rect(surf, (255, 255, 255),
+                         jogar_btn_rect.inflate(6, 6), 3, border_radius=28)
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+    else:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+
+    # Dica discreta no rodapé
+    hint = font_small.render("Clique em JOGAR ou pressione ENTER", True, (220, 220, 220))
+    shadow = font_small.render("Clique em JOGAR ou pressione ENTER", True, (0, 0, 0))
+    surf.blit(shadow, (WIDTH // 2 - hint.get_width() // 2 + 1, HEIGHT - 28))
+    surf.blit(hint,   (WIDTH // 2 - hint.get_width() // 2,     HEIGHT - 29))
+
+
+# ─── NOVA TELA: INSTRUÇÕES ────────────────────────────────────────────────────
+def draw_instructions(surf, font_title, font_small, font_big, tick):
+    """
+    Tela de instruções/controles que aparece após o JOGAR e antes da seleção
+    de personagens.
+    """
+    # Fundo com gradiente escuro
+    for y in range(HEIGHT):
+        t = y / HEIGHT
+        pygame.draw.line(surf,
+                         (int(8 * (1 - t) + 20 * t),
+                          int(5 * (1 - t) + 12 * t),
+                          int(25 * (1 - t) + 55 * t)),
+                         (0, y), (WIDTH, y))
+
+    # Título
+    title = font_title.render("COMO JOGAR", True, C_YELLOW)
+    surf.blit(title, (WIDTH // 2 - title.get_width() // 2, 40))
+
+    # Linha decorativa
+    pygame.draw.line(surf, C_YELLOW,
+                     (WIDTH // 2 - 300, 110), (WIDTH // 2 + 300, 110), 2)
+
+    # Painéis lado a lado
+    panels = [
+        {
+            "title": "JOGADOR 1",
+            "color": C_P1,
+            "x": 80,
+            "controls": [
+                ("Mover",        "A  /  D"),
+                ("Pular",        "W   (2x = double jump)"),
+                ("Ataque Leve",  "F"),
+                ("Ataque Forte", "G"),
+                ("Dodge / Air Dash", "S"),
+            ],
+        },
+        {
+            "title": "JOGADOR 2",
+            "color": C_P2,
+            "x": WIDTH // 2 + 80,
+            "controls": [
+                ("Mover",        "← / →"),
+                ("Pular",        "↑   (2x = double jump)"),
+                ("Ataque Leve",  "L"),
+                ("Ataque Forte", "K"),
+                ("Dodge / Air Dash", "↓"),
+            ],
+        },
     ]
-    y = 180
-    for text, color in lines:
-        t = font_small.render(text, True, color)
-        surf.blit(t, (WIDTH // 2 - 250, y))
-        y += 32
-    start = font_small.render("Pressione ENTER para escolher personagens!", True, C_YELLOW)
-    surf.blit(start, (WIDTH // 2 - start.get_width() // 2, y + 20))
+
+    panel_w = 510
+    panel_h = 340
+
+    for panel in panels:
+        px, py = panel["x"], 140
+        col = panel["color"]
+
+        # Fundo do painel
+        bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        bg.fill((*col, 25))
+        surf.blit(bg, (px, py))
+        pygame.draw.rect(surf, col, (px, py, panel_w, panel_h), 2, border_radius=12)
+
+        # Título do painel
+        t = font_big.render(panel["title"], True, col)
+        surf.blit(t, (px + panel_w // 2 - t.get_width() // 2, py + 14))
+        pygame.draw.line(surf, col, (px + 20, py + 58), (px + panel_w - 20, py + 58), 1)
+
+        # Controles
+        for idx, (action, key) in enumerate(panel["controls"]):
+            row_y = py + 75 + idx * 50
+            # Ação
+            act_s = font_small.render(action, True, (200, 200, 230))
+            surf.blit(act_s, (px + 24, row_y))
+            # Fundo da tecla
+            key_s = font_small.render(key, True, C_YELLOW)
+            key_bg = pygame.Surface((key_s.get_width() + 16, key_s.get_height() + 6), pygame.SRCALPHA)
+            key_bg.fill((255, 220, 50, 40))
+            surf.blit(key_bg, (px + panel_w - key_s.get_width() - 28, row_y - 2))
+            surf.blit(key_s, (px + panel_w - key_s.get_width() - 20, row_y))
+
+    # Dica geral
+    tip_y = 510
+    tips = [
+        "• Empurre o adversário para fora da arena para marcar pontos",
+        "• Cada jogador começa com 3 vidas — quem ficar sem primeiro perde",
+        "• Quanto maior o % de dano, mais longe você voa ao ser atingido",
+    ]
+    for i, tip in enumerate(tips):
+        tip_s = font_small.render(tip, True, (180, 175, 220))
+        surf.blit(tip_s, (WIDTH // 2 - tip_s.get_width() // 2, tip_y + i * 30))
+
+    # Botão "CONTINUAR"
+    btn_w, btn_h = 340, 54
+    btn_x = WIDTH // 2 - btn_w // 2
+    btn_y = HEIGHT - 80
+
+    pulse = 0.75 + 0.25 * math.sin(tick * 0.09)
+    btn_col = tuple(int(c * pulse) for c in C_YELLOW)
+    pygame.draw.rect(surf, (30, 25, 60), (btn_x, btn_y, btn_w, btn_h), border_radius=28)
+    pygame.draw.rect(surf, btn_col, (btn_x, btn_y, btn_w, btn_h), 3, border_radius=28)
+
+    mouse_pos = pygame.mouse.get_pos()
+    btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+    hovering = btn_rect.collidepoint(mouse_pos)
+    if hovering:
+        fill = pygame.Surface((btn_w, btn_h), pygame.SRCALPHA)
+        fill.fill((255, 220, 50, 30))
+        surf.blit(fill, (btn_x, btn_y))
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+    else:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+
+    btn_text = font_small.render("▶  ESCOLHER PERSONAGEM", True, C_YELLOW)
+    surf.blit(btn_text, (btn_x + btn_w // 2 - btn_text.get_width() // 2,
+                          btn_y + btn_h // 2 - btn_text.get_height() // 2))
+
+    return btn_rect  # retorna o rect para detecção de clique
 
 
 def draw_landscape_select(surf, font_title, font_small, font_big,
@@ -951,7 +1084,6 @@ def draw_winner(surf, winner, font_title, font_small, win_particles):
     overlay.fill((0, 0, 0, 160))
     surf.blit(overlay, (0, 0))
 
-    # REMOVE partículas mortas antes de desenhar
     win_particles[:] = [p for p in win_particles if p.life > 0]
 
     for p in win_particles:
@@ -971,7 +1103,7 @@ def draw_winner(surf, winner, font_title, font_small, win_particles):
 def main():
     pygame.init()
     surf = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Brawl Clone")
+    pygame.display.set_caption("Insper Brawl")
     clock = pygame.time.Clock()
 
     try:
@@ -998,6 +1130,22 @@ def main():
             raise FileNotFoundError(f"Imagem não encontrada: {path}")
         img = pygame.image.load(path).convert_alpha()
         return pygame.transform.smoothscale(img, (WIDTH, HEIGHT))
+
+    # ── Carrega a capa ─────────────────────────────────────────────────────
+    capa_path = os.path.join(base_dir, "imagens", "capa.png")
+    if os.path.exists(capa_path):
+        capa_img = pygame.image.load(capa_path).convert_alpha()
+        capa_img = pygame.transform.smoothscale(capa_img, (WIDTH, HEIGHT))
+    else:
+        # Fallback: fundo escuro com texto caso o arquivo não seja encontrado
+        capa_img = pygame.Surface((WIDTH, HEIGHT))
+        capa_img.fill(C_DARK)
+        fb = pygame.font.SysFont("Arial Black", 72, bold=True)
+        t = fb.render("INSPER BRAWL", True, C_YELLOW)
+        capa_img.blit(t, (WIDTH // 2 - t.get_width() // 2, HEIGHT // 2 - 60))
+        print(f"[AVISO] capa.png não encontrado em: {capa_path}")
+
+    jogar_btn_rect = get_jogar_button_rect()
 
     bg_images = {
         "Cosmos": load_bg("ilhadoceu.png"),
@@ -1032,10 +1180,11 @@ def main():
     p1, p2 = make_players()
     effects = []
     global_particles = []
-    state = "intro"
+    state = "intro"          # estados: intro | instructions | char_select | landscape_select | game | win
     winner = None
     win_particles = []
     tick = 0
+    instructions_btn_rect = pygame.Rect(0, 0, 0, 0)  # atualizado no draw
 
     def spawn_win_particles(color):
         return [Particle(
@@ -1072,12 +1221,19 @@ def main():
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    if state == "win":
+                    if state in ("win", "game"):
                         reset_to_char_select()
+                    elif state in ("char_select", "landscape_select", "instructions"):
+                        state = "intro"
                     else:
                         running = False
 
+                # ── Tela inicial ──────────────────────────────────────────
                 if state == "intro" and event.key == pygame.K_RETURN:
+                    state = "instructions"
+
+                # ── Tela de instruções ────────────────────────────────────
+                elif state == "instructions" and event.key in (pygame.K_RETURN, pygame.K_SPACE):
                     state = "char_select"
                     css["p1_ready"] = False
                     css["p2_ready"] = False
@@ -1126,6 +1282,17 @@ def main():
                         reset_match()
                     elif event.key == pygame.K_m:
                         reset_to_char_select()
+
+            # ── Cliques do mouse ──────────────────────────────────────────
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mpos = event.pos
+                if state == "intro" and jogar_btn_rect.collidepoint(mpos):
+                    state = "instructions"
+                elif state == "instructions" and instructions_btn_rect.collidepoint(mpos):
+                    state = "char_select"
+                    css["p1_ready"] = False
+                    css["p2_ready"] = False
+                    css_ready_timer = 0
 
         if state == "char_select":
             if css["p1_ready"] and css["p2_ready"]:
@@ -1180,13 +1347,20 @@ def main():
                 pg.update()
             global_particles = [pg for pg in global_particles if pg.life > 0]
 
+        # ── Renderização ──────────────────────────────────────────────────
         if state == "intro":
-            draw_intro(surf, font_title, font_small)
+            draw_intro(surf, font_small, capa_img, tick, jogar_btn_rect)
+
+        elif state == "instructions":
+            instructions_btn_rect = draw_instructions(surf, font_title, font_small, font_big, tick)
+
         elif state == "char_select":
             draw_character_select(surf, font_title, font_small, font_big, css, tick)
+
         elif state == "landscape_select":
             draw_landscape_select(surf, font_title, font_small, font_big,
                                   selected_landscape_idx, tick, bg_images, bg_cards)
+
         elif state in ("game", "win"):
             draw_background(surf, current_landscape, bg_images)
             draw_platforms(surf, PLATFORMS, current_landscape)
@@ -1205,6 +1379,7 @@ def main():
 
         pygame.display.flip()
 
+    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
     pygame.quit()
     sys.exit()
 
