@@ -865,14 +865,14 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
 def get_jogar_button_rect():
     """
     Retorna o pygame.Rect do botão JOGAR mapeado para a resolução 1280x720.
-    Na imagem original (2560x1440) o botão fica em ~(230,490)-(590,565).
-    Escala: 1280/2560 = 0.5 e 720/1440 = 0.5
+    Coordenadas obtidas por análise de pixels da imagem original (1672x941):
+      botão laranja: x=194-791, y=565-632  →  escalado para 1280x720: x=148-605, y=432-483
+    Adicionamos uma margem extra para facilitar o clique.
     """
-    # Coordenadas na imagem original 2560x1440, escaladas para 1280x720
-    x = int(230 * 1280 / 2560)
-    y = int(482 * 720 / 1440)
-    w = int(360 * 1280 / 2560)
-    h = int(88  * 720 / 1440)
+    x = 140
+    y = 425
+    w = 475
+    h = 68
     return pygame.Rect(x, y, w, h)
 
 
@@ -883,12 +883,12 @@ def draw_intro(surf, font_small, capa_img, tick, jogar_btn_rect):
     """
     surf.blit(capa_img, (0, 0))
 
-    # Efeito de brilho pulsante sobre o botão para indicar que é clicável
     mouse_pos = pygame.mouse.get_pos()
     hovering = jogar_btn_rect.collidepoint(mouse_pos)
 
+    # Efeito de brilho pulsante sobre o botão
     pulse = 0.4 + 0.35 * math.sin(tick * 0.08)
-    alpha = int(pulse * 80) if not hovering else 120
+    alpha = int(pulse * 80) if not hovering else 140
     glow_surf = pygame.Surface((jogar_btn_rect.w + 20, jogar_btn_rect.h + 20), pygame.SRCALPHA)
     glow_col = (255, 220, 50, alpha)
     pygame.draw.rect(glow_surf, glow_col,
