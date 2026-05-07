@@ -655,7 +655,7 @@ def draw_platforms(surf, platforms, landscape_name):
 # (centro X de cada pedestal, Y do topo da plataforma azul)
 PED_LEFT_CX  = 455   # centro X pedestal esquerdo (P1)
 PED_RIGHT_CX = 780   # centro X pedestal direito  (P2)
-PED_TOP_Y    = 588   # Y do topo da plataforma azul (onde o personagem pisa)
+PED_TOP_Y    = 535  # Y do topo da plataforma azul (onde o personagem pisa)
 
 # Grid de thumbnails
 THUMB_W, THUMB_H = 68, 68
