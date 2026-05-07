@@ -991,7 +991,9 @@ def _draw_player_info_panel(surf, char, title, p_label, p_col, is_ready,
 
 # ─── TELA INICIAL COM capa.png ────────────────────────────────────────────────
 def get_jogar_button_rect():
-    return pygame.Rect(140, 425, 475, 68)
+    # Coordenadas calibradas para a posição real do botão JOGAR na capa.png
+    # (imagem original 1672x941 escalada para 1280x720)
+    return pygame.Rect(142, 367, 392, 136)
 
 
 def draw_intro(surf, font_small, capa_img, tick, jogar_btn_rect):
