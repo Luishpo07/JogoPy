@@ -40,6 +40,50 @@ C_P2_DARK = (180, 30, 30)
 SPRITE_CACHE = {}
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  LOCALIZAÇÃO ROBUSTA DA PASTA "imagens"
+#  Procura em vários lugares relativos ao script para funcionar independente
+#  de onde o arquivo .py esteja dentro da estrutura de pastas.
+# ══════════════════════════════════════════════════════════════════════════════
+def find_imagens_dir(script_path):
+    """
+    Tenta localizar a pasta 'imagens' a partir do diretório do script.
+    Verifica os seguintes caminhos (em ordem):
+      1. <script_dir>/imagens
+      2. <script_dir>/Anexos/imagens
+      3. <parent>/imagens
+      4. <parent>/Anexos/imagens
+      5. <grandparent>/imagens
+      6. <grandparent>/Anexos/imagens
+    Retorna o primeiro que existir, ou o caminho padrão como fallback.
+    """
+    d = os.path.dirname(os.path.abspath(script_path))
+    parent = os.path.dirname(d)
+    grandparent = os.path.dirname(parent)
+
+    candidates = [
+        os.path.join(d,           "imagens"),
+        os.path.join(d,           "Anexos", "imagens"),
+        os.path.join(parent,      "imagens"),
+        os.path.join(parent,      "Anexos", "imagens"),
+        os.path.join(grandparent, "imagens"),
+        os.path.join(grandparent, "Anexos", "imagens"),
+    ]
+
+    for path in candidates:
+        if os.path.isdir(path):
+            print(f"[INFO] Pasta 'imagens' encontrada em: {path}")
+            return path
+
+    # Fallback: caminho padrão mesmo que não exista (vai gerar erro descritivo depois)
+    fallback = os.path.join(d, "imagens")
+    print(f"[AVISO] Pasta 'imagens' não encontrada. Tentativas:")
+    for c in candidates:
+        print(f"        {c}")
+    print(f"        Usando fallback: {fallback}")
+    return fallback
+
+
 def load_sprites(base_dir):
     folder = os.path.join(base_dir, "Personagem1")
 
@@ -648,47 +692,37 @@ def draw_platforms(surf, platforms, landscape_name):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  TELA DE SELEÇÃO DE PERSONAGEM — ESTILO BRAWLHALLA com selecaopersonagem.png
+#  TELA DE SELEÇÃO DE PERSONAGEM
 # ══════════════════════════════════════════════════════════════════════════════
 
-# Posições dos pedestais na imagem selecaopersonagem.png
-# (centro X de cada pedestal, Y do topo da plataforma azul)
-PED_LEFT_CX  = 455   # centro X pedestal esquerdo (P1)
-PED_RIGHT_CX = 780   # centro X pedestal direito  (P2)
-PED_TOP_Y    = 588   # Y do topo da plataforma azul (onde o personagem pisa)
+PED_LEFT_CX  = 455
+PED_RIGHT_CX = 780
+PED_TOP_Y    = 588
 
-# Grid de thumbnails
 THUMB_W, THUMB_H = 68, 68
 THUMB_GAP = 5
 GRID_COLS = 6
-GRID_X0 = 240   # início X da grade
-GRID_Y0 = 10    # início Y da grade
+GRID_X0 = 240
+GRID_Y0 = 10
 
-# Painel info embaixo
-INFO_PANEL_Y = 590  # Y dos painéis de info (abaixo dos pedestais)
+INFO_PANEL_Y = 590
 INFO_PANEL_H = 125
 
 
 def _draw_char_big_on_pedestal(surf, char, cx, foot_y, tick, facing=1, anim_frame=0,
                                 player_col=None, is_ready=False):
-    """Desenha o personagem grande posicionado em cima do pedestal."""
-    # Tamanho do personagem exibido no pedestal
     W2, H2 = 58, 88
-
     bob = int(math.sin(tick * 0.06) * 4)
     bx = cx - W2 // 2
     by = foot_y - H2 + bob
 
-    # Glow sob o personagem (reflexo na plataforma azul)
     if player_col:
         glow_alpha = 90 + int(math.sin(tick * 0.08) * 30)
         glow_w, glow_h = 110, 28
         glow_surf = pygame.Surface((glow_w, glow_h), pygame.SRCALPHA)
-        pygame.draw.ellipse(glow_surf, (*player_col, glow_alpha),
-                            (0, 0, glow_w, glow_h))
+        pygame.draw.ellipse(glow_surf, (*player_col, glow_alpha), (0, 0, glow_w, glow_h))
         surf.blit(glow_surf, (cx - glow_w // 2, foot_y - 10))
 
-    # Sprite ou forma geométrica
     if char.get("use_sprite") and SPRITE_CACHE:
         idle = SPRITE_CACHE["p1_idle"]
         orig_w, orig_h = idle.get_size()
@@ -697,7 +731,6 @@ def _draw_char_big_on_pedestal(surf, char, cx, foot_y, tick, facing=1, anim_fram
         scaled = scale_sprite(idle, tgt_w, tgt_h)
         if facing == -1:
             scaled = flip_sprite(scaled)
-        # Glow de seleção atrás do sprite
         if is_ready and player_col:
             glow2 = pygame.Surface((tgt_w + 30, tgt_h + 30), pygame.SRCALPHA)
             a2 = 50 + int(math.sin(tick * 0.1) * 25)
@@ -706,14 +739,11 @@ def _draw_char_big_on_pedestal(surf, char, cx, foot_y, tick, facing=1, anim_fram
         surf.blit(scaled, (cx - tgt_w // 2, foot_y - tgt_h + bob))
         return
 
-    # Forma geométrica
     body_rect = pygame.Rect(bx, by, W2, H2)
     pygame.draw.rect(surf, char["dark_color"], body_rect, border_radius=12)
     pygame.draw.rect(surf, char["color"], body_rect.inflate(-8, -8), border_radius=9)
     sc = char["special_color"]
     pygame.draw.rect(surf, sc, (bx + 6, by + 6, W2 - 12, 6), border_radius=3)
-
-    # Cabeça
     hcx = cx + (9 if facing == 1 else -9)
     hcy = by - 17
     pygame.draw.circle(surf, char["dark_color"], (hcx, hcy), 20)
@@ -721,14 +751,10 @@ def _draw_char_big_on_pedestal(surf, char, cx, foot_y, tick, facing=1, anim_fram
     eoff = 7 if facing == 1 else -7
     pygame.draw.circle(surf, C_WHITE, (hcx + eoff, hcy - 2), 5)
     pygame.draw.circle(surf, C_DARK, (hcx + eoff + facing, hcy - 2), 3)
-
-    # Braço animado
     arm_s = int(math.sin(anim_frame * 0.07) * 10)
     ax = bx + (W2 if facing == 1 else 0)
     pygame.draw.line(surf, sc, (ax, by + H2 // 3),
                      (ax + (14 + arm_s) * facing, by + H2 // 3 - 12), 6)
-
-    # Pernas animadas
     ls = int(math.sin(anim_frame * 0.09) * 12)
     pygame.draw.line(surf, char["dark_color"],
                      (bx + W2 // 3, by + H2), (bx + W2 // 3 - ls, by + H2 + 16), 6)
@@ -738,8 +764,6 @@ def _draw_char_big_on_pedestal(surf, char, cx, foot_y, tick, facing=1, anim_fram
 
 def _draw_char_thumbnail(surf, char, tx, ty, w, h, idx, tick,
                           sel_p1=False, sel_p2=False):
-    """Thumbnail do personagem na grade — estilo Brawlhalla."""
-    # Gradiente de fundo
     c1 = char["color"]
     c2 = char["dark_color"]
     for row in range(h):
@@ -747,19 +771,16 @@ def _draw_char_thumbnail(surf, char, tx, ty, w, h, idx, tick,
         rc = tuple(int(c1[i] * (1 - t) + c2[i] * t) for i in range(3))
         pygame.draw.line(surf, rc, (tx, ty + row), (tx + w, ty + row))
 
-    # Mini personagem
     bw, bh = max(10, w // 3 + 2), max(14, h // 2 + 2)
     bx2 = tx + w // 2 - bw // 2
     by2 = ty + h // 2 - bh // 2 + 4
     pygame.draw.rect(surf, char["dark_color"], (bx2, by2, bw, bh), border_radius=5)
     pygame.draw.rect(surf, char["color"], (bx2 + 2, by2 + 2, bw - 4, bh - 4), border_radius=4)
-    # Cabeça pequena
     hr = max(5, bw // 2)
     pygame.draw.circle(surf, char["dark_color"], (tx + w // 2, by2 - hr + 2), hr + 1)
     pygame.draw.circle(surf, char["color"], (tx + w // 2, by2 - hr + 2), hr - 1)
     pygame.draw.circle(surf, C_WHITE, (tx + w // 2 + 3, by2 - hr + 1), 2)
 
-    # Borda de seleção
     r = pygame.Rect(tx, ty, w, h)
     if sel_p1 and sel_p2:
         pygame.draw.rect(surf, C_P1, (tx, ty, w // 2, h), 3)
@@ -785,19 +806,13 @@ def _draw_stat_bar(surf, x, y, label, val, max_val, color, font):
         pygame.draw.rect(surf, color, (bx, y + 3, fw, 7), border_radius=4)
 
 
-def draw_character_select(surf, font_title, font_small, font_big, css, tick,
-                           charsel_bg):
-    """Tela de seleção de personagem com selecaopersonagem.png como fundo."""
-
-    # ── 1. Fundo: imagem do pedestal ──────────────────────────────────────
+def draw_character_select(surf, font_title, font_small, font_big, css, tick, charsel_bg):
     surf.blit(charsel_bg, (0, 0))
 
-    # Overlay semitransparente escuro no topo para legibilidade da grade
     top_overlay = pygame.Surface((WIDTH, 310), pygame.SRCALPHA)
     top_overlay.fill((0, 0, 0, 155))
     surf.blit(top_overlay, (0, 0))
 
-    # ── 2. Barra superior ─────────────────────────────────────────────────
     try:
         title_font = pygame.font.SysFont("Arial Black", 20, bold=True)
         ctrl_font  = pygame.font.SysFont("Arial", 13)
@@ -814,26 +829,23 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick,
     title_s = title_font.render("SELECIONE SEU PERSONAGEM", True, C_YELLOW)
     surf.blit(title_s, (WIDTH // 2 - title_s.get_width() // 2, 8))
 
-    # Botão VOLTAR
     back_rect = pygame.Rect(8, 6, 90, 26)
     pygame.draw.rect(surf, (15, 28, 65), back_rect, border_radius=5)
     pygame.draw.rect(surf, (45, 80, 160), back_rect, 1, border_radius=5)
     back_s = ctrl_font.render("◄  VOLTAR", True, (190, 205, 255))
     surf.blit(back_s, (back_rect.x + 8, back_rect.y + 7))
 
-    # ── 3. Grade de personagens ────────────────────────────────────────────
     n = len(CHARACTERS)
     cols = GRID_COLS
     rows = math.ceil(n / cols)
     cell_w = THUMB_W + THUMB_GAP
-    cell_h = THUMB_H + THUMB_GAP + 16   # +16 para nome abaixo
+    cell_h = THUMB_H + THUMB_GAP + 16
     total_gw = cols * cell_w - THUMB_GAP
     total_gh = rows * cell_h - THUMB_GAP
 
     gsx = WIDTH // 2 - total_gw // 2
     gsy = bar_h + 6
 
-    # Fundo da grade
     pad = 7
     grid_bg = pygame.Surface((total_gw + pad * 2, total_gh + pad * 2), pygame.SRCALPHA)
     grid_bg.fill((8, 14, 40, 195))
@@ -851,7 +863,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick,
         sel_p1 = css["p1_idx"] == idx
         sel_p2 = css["p2_idx"] == idx
 
-        # Highlight de fundo
         if sel_p1 or sel_p2:
             hl = pygame.Surface((THUMB_W + 4, THUMB_H + 4), pygame.SRCALPHA)
             hl.fill((80, 150, 255, 50))
@@ -860,12 +871,10 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick,
         _draw_char_thumbnail(surf, char, tx, ty, THUMB_W, THUMB_H, idx, tick,
                              sel_p1=sel_p1, sel_p2=sel_p2)
 
-        # Nome abaixo do thumb
         nm_col = char["accent"] if (sel_p1 or sel_p2) else (130, 125, 170)
         nm = ctrl_font.render(char["name"], True, nm_col)
         surf.blit(nm, (tx + THUMB_W // 2 - nm.get_width() // 2, ty + THUMB_H + 2))
 
-    # Bolinha P1/P2 sobre o thumb selecionado
     for pidx, pcol, plabel in [(css["p1_idx"], C_P1, "P1"), (css["p2_idx"], C_P2, "P2")]:
         col_i = pidx % cols
         row_i = pidx // cols
@@ -882,7 +891,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick,
         ps = pf.render(plabel, True, C_WHITE)
         surf.blit(ps, (dot_x + 5 - ps.get_width() // 2, dot_y + 5 - ps.get_height() // 2))
 
-    # ── 4. Personagens nos pedestais ──────────────────────────────────────
     p1c = CHARACTERS[css["p1_idx"]]
     p2c = CHARACTERS[css["p2_idx"]]
 
@@ -893,8 +901,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick,
                                 facing=-1, anim_frame=tick,
                                 player_col=C_P2, is_ready=css["p2_ready"])
 
-    # ── 5. Painéis de info dos jogadores (abaixo dos pedestais) ───────────
-    # Painel P1 (esquerdo)
     _draw_player_info_panel(surf, p1c, "JOGADOR 1", "P1", C_P1,
                              css["p1_ready"],
                              "A / D: mover   W: pular   F/G: atacar   S: dodge",
@@ -902,7 +908,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick,
                              20, INFO_PANEL_Y, 380, INFO_PANEL_H,
                              name_font, stat_font, info_font, tick)
 
-    # Painel P2 (direito)
     _draw_player_info_panel(surf, p2c, "JOGADOR 2", "P2", C_P2,
                              css["p2_ready"],
                              "← / →: mover   ↑: pular   L/K: atacar   ↓: dodge",
@@ -910,7 +915,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick,
                              WIDTH - 400, INFO_PANEL_Y, 380, INFO_PANEL_H,
                              name_font, stat_font, info_font, tick)
 
-    # ── 6. Mensagem central (prontos / dica) ──────────────────────────────
     mid_x = WIDTH // 2
     if css["p1_ready"] and css["p2_ready"]:
         pulse = 0.55 + 0.45 * abs(math.sin(tick * 0.1))
@@ -920,7 +924,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick,
         except Exception:
             gf = pygame.font.Font(None, 26)
         go_s = gf.render("✔  AMBOS PRONTOS — INICIANDO!", True, go_col)
-        # shadow
         go_sh = gf.render("✔  AMBOS PRONTOS — INICIANDO!", True, (0, 0, 0))
         surf.blit(go_sh, (mid_x - go_s.get_width() // 2 + 1, HEIGHT - 26))
         surf.blit(go_s,  (mid_x - go_s.get_width() // 2,     HEIGHT - 27))
@@ -943,42 +946,24 @@ def _draw_player_info_panel(surf, char, title, p_label, p_col, is_ready,
                               ctrl_str, confirm_str,
                               px, py, pw, ph,
                               name_font, stat_font, info_font, tick):
-    """Painel de informações de um jogador, posicionado abaixo do pedestal."""
-    # Fundo semitransparente
     bg = pygame.Surface((pw, ph), pygame.SRCALPHA)
     bg.fill((5, 10, 30, 200))
     surf.blit(bg, (px, py))
-
-    # Borda na cor do jogador
     pulse = 0.65 + 0.35 * math.sin(tick * 0.08)
     bdr = tuple(int(c * pulse) for c in p_col)
     pygame.draw.rect(surf, bdr, (px, py, pw, ph), 2, border_radius=6)
-
-    # Linha decorativa no topo
     pygame.draw.line(surf, p_col, (px + 4, py + 2), (px + pw - 4, py + 2), 1)
-
     row_y = py + 8
-
-    # Título do jogador + nome do personagem
     title_s = name_font.render(title, True, p_col)
     surf.blit(title_s, (px + 8, row_y))
-
     char_name_s = name_font.render(char["name"], True, char["accent"])
     surf.blit(char_name_s, (px + pw - char_name_s.get_width() - 8, row_y))
-
     row_y += 20
-
-    # Descrição
     desc_s = stat_font.render(char["desc"], True, (175, 165, 210))
     surf.blit(desc_s, (px + 8, row_y))
-
-    # Habilidade especial
     abil_s = stat_font.render(f"Habilidade: {char['ability']}", True, char["special_color"])
     surf.blit(abil_s, (px + pw // 2 + 4, row_y))
-
     row_y += 18
-
-    # Barras de stats — 4 stats em 2 colunas
     stat_data = [
         ("FOR", char["stats"]["força"],     10, char["accent"]),
         ("VEL", char["stats"]["velocidade"],10, char["accent"]),
@@ -990,15 +975,10 @@ def _draw_player_info_panel(surf, char, title, p_label, p_col, is_ready,
         cx2 = px + 8 + (si % 2) * (col_w + 8)
         cy2 = row_y + (si // 2) * 16
         _draw_stat_bar(surf, cx2, cy2, label, val, mx, col, stat_font)
-
     row_y += 38
-
-    # Controles
     ctrl_s = stat_font.render(ctrl_str, True, (175, 175, 215))
     surf.blit(ctrl_s, (px + 8, row_y))
     row_y += 14
-
-    # Confirmação / pronto
     if is_ready:
         rp = 0.5 + 0.5 * abs(math.sin(tick * 0.12))
         rc = tuple(int(c * rp) for c in (80, 255, 100))
@@ -1140,25 +1120,33 @@ def draw_landscape_select(surf, font_title, font_small, font_big,
     surf.blit(instr, (WIDTH//2 - instr.get_width()//2, HEIGHT-50))
 
 
+# ─── TELA DE VITÓRIA: MISSÃO CONCLUÍDA ───────────────────────────────────────
 def draw_missao_concluida(surf, font_small, missao_img, winner, tick, win_particles):
+    # Fundo: imagem missao_concluida.png em tela cheia
     surf.blit(missao_img, (0, 0))
+
+    # Partículas de celebração
     win_particles[:] = [p for p in win_particles if p.life > 0]
     for p in win_particles:
         p.update()
         p.draw(surf)
+
+    # Nome do vencedor
     try:
         wfont = pygame.font.SysFont("Arial Black", 36, bold=True)
     except Exception:
         wfont = pygame.font.Font(None, 46)
+
     winner_text = wfont.render(f"🏆  {winner} VENCEU!", True, C_YELLOW)
     shadow_text = wfont.render(f"🏆  {winner} VENCEU!", True, (0, 0, 0))
-    wx = WIDTH//2 - winner_text.get_width()//2
-    surf.blit(shadow_text, (wx+2, 432))
-    surf.blit(winner_text, (wx,   430))
+    wx = WIDTH // 2 - winner_text.get_width() // 2
+    surf.blit(shadow_text, (wx + 2, 432))
+    surf.blit(winner_text, (wx,     430))
 
+    # Botões REINICIAR e MENU
     btn_w, btn_h = 260, 62
     gap = 40
-    btn_start_x = WIDTH//2 - (btn_w*2+gap)//2
+    btn_start_x = WIDTH // 2 - (btn_w * 2 + gap) // 2
     reiniciar_rect = pygame.Rect(btn_start_x, 510, btn_w, btn_h)
     menu_rect      = pygame.Rect(btn_start_x + btn_w + gap, 510, btn_w, btn_h)
     mouse_pos = pygame.mouse.get_pos()
@@ -1170,11 +1158,11 @@ def draw_missao_concluida(surf, font_small, missao_img, winner, tick, win_partic
         hover = rect.collidepoint(mouse_pos)
         pulse = 0.85 + 0.15 * math.sin(tick * 0.1)
         c = tuple(min(255, int(v * (1.15 if hover else pulse))) for v in base_col)
-        shad = pygame.Surface((btn_w+6, btn_h+6), pygame.SRCALPHA)
+        shad = pygame.Surface((btn_w + 6, btn_h + 6), pygame.SRCALPHA)
         shad.fill((0, 0, 0, 100))
-        surf.blit(shad, (rect.x-2, rect.y+4))
+        surf.blit(shad, (rect.x - 2, rect.y + 4))
         pygame.draw.rect(surf, c, rect, border_radius=32)
-        hl = pygame.Surface((btn_w, btn_h//2), pygame.SRCALPHA)
+        hl = pygame.Surface((btn_w, btn_h // 2), pygame.SRCALPHA)
         hl.fill((255, 255, 255, 30))
         surf.blit(hl, (rect.x, rect.y))
         pygame.draw.rect(surf, hover_col if hover else bdr_col, rect, 2, border_radius=32)
@@ -1183,18 +1171,20 @@ def draw_missao_concluida(surf, font_small, missao_img, winner, tick, win_partic
         except Exception:
             bf = pygame.font.Font(None, 28)
         bt = bf.render(label, True, text_col)
-        surf.blit(bt, (rect.centerx - bt.get_width()//2, rect.centery - bt.get_height()//2))
+        surf.blit(bt, (rect.centerx - bt.get_width() // 2,
+                       rect.centery - bt.get_height() // 2))
 
     if reiniciar_rect.collidepoint(mouse_pos) or menu_rect.collidepoint(mouse_pos):
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
     else:
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
-    hint = font_small.render("R = reiniciar   |   M = menu   |   ESC = sair", True, (200,200,200))
-    sh   = font_small.render("R = reiniciar   |   M = menu   |   ESC = sair", True, (0,0,0))
-    hx = WIDTH//2 - hint.get_width()//2
-    surf.blit(sh,   (hx+1, HEIGHT-27))
-    surf.blit(hint, (hx,   HEIGHT-28))
+    hint = font_small.render("R = reiniciar   |   M = menu   |   ESC = sair", True, (200, 200, 200))
+    sh   = font_small.render("R = reiniciar   |   M = menu   |   ESC = sair", True, (0, 0, 0))
+    hx = WIDTH // 2 - hint.get_width() // 2
+    surf.blit(sh,   (hx + 1, HEIGHT - 27))
+    surf.blit(hint, (hx,     HEIGHT - 28))
+
     return reiniciar_rect, menu_rect
 
 
@@ -1213,7 +1203,11 @@ def main():
         font_big   = pygame.font.Font(None, 52)
         font_small = pygame.font.Font(None, 28)
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # ── Localiza a pasta "imagens" de forma robusta ────────────────────────
+    # Passa __file__ para encontrar imagens mesmo que o script esteja
+    # numa pasta diferente de "imagens" (ex: Anexos/imagens)
+    base_dir   = os.path.dirname(os.path.abspath(__file__))
+    imagens_dir = find_imagens_dir(__file__)
 
     sprites_ok = load_sprites(base_dir)
     if not sprites_ok:
@@ -1223,32 +1217,36 @@ def main():
                 c["use_sprite"] = False
 
     def load_bg(filename):
-        path = os.path.join(base_dir, "imagens", filename)
+        path = os.path.join(imagens_dir, filename)
         if not os.path.exists(path):
-            raise FileNotFoundError(f"Imagem não encontrada: {path}")
+            raise FileNotFoundError(
+                f"Imagem não encontrada: {path}\n"
+                f"Certifique-se de que a pasta 'imagens' contém o arquivo '{filename}'."
+            )
         img = pygame.image.load(path).convert_alpha()
         return pygame.transform.smoothscale(img, (WIDTH, HEIGHT))
 
     # Capa
-    capa_path = os.path.join(base_dir, "imagens", "capa.png")
+    capa_path = os.path.join(imagens_dir, "capa.png")
     if os.path.exists(capa_path):
         capa_img = pygame.transform.smoothscale(
             pygame.image.load(capa_path).convert_alpha(), (WIDTH, HEIGHT))
+        print("[OK] capa.png carregado.")
     else:
         capa_img = pygame.Surface((WIDTH, HEIGHT))
         capa_img.fill(C_DARK)
         fb = pygame.font.SysFont("Arial Black", 72, bold=True)
         t = fb.render("INSPER BRAWL", True, C_YELLOW)
         capa_img.blit(t, (WIDTH//2 - t.get_width()//2, HEIGHT//2 - 60))
+        print(f"[AVISO] capa.png não encontrado em: {capa_path}")
 
     # Background da tela de seleção de personagem
-    charsel_bg_path = os.path.join(base_dir, "imagens", "selecaopersonagem.png")
+    charsel_bg_path = os.path.join(imagens_dir, "selecaopersonagem.png")
     if os.path.exists(charsel_bg_path):
         charsel_bg = pygame.transform.smoothscale(
             pygame.image.load(charsel_bg_path).convert_alpha(), (WIDTH, HEIGHT))
         print("[OK] selecaopersonagem.png carregado.")
     else:
-        # Fallback: gradiente azul escuro
         charsel_bg = pygame.Surface((WIDTH, HEIGHT))
         for y in range(HEIGHT):
             t = y / HEIGHT
@@ -1258,17 +1256,27 @@ def main():
             pygame.draw.line(charsel_bg, (r, g, b), (0, y), (WIDTH, y))
         print(f"[AVISO] selecaopersonagem.png não encontrado em: {charsel_bg_path}")
 
-    # Missão concluída
-    missao_path = os.path.join(base_dir, "imagens", "missao_concluida.png")
+    # Missão concluída — caminho usa imagens_dir
+    missao_path = os.path.join(imagens_dir, "missao_concluida.png")
     if os.path.exists(missao_path):
         missao_img = pygame.transform.smoothscale(
             pygame.image.load(missao_path).convert_alpha(), (WIDTH, HEIGHT))
+        print("[OK] missao_concluida.png carregado.")
     else:
+        # Fallback com gradiente escuro e texto
         missao_img = pygame.Surface((WIDTH, HEIGHT))
-        missao_img.fill((10, 10, 40))
-        fb2 = pygame.font.SysFont("Arial Black", 72, bold=True)
+        for y in range(HEIGHT):
+            t = y / HEIGHT
+            pygame.draw.line(missao_img,
+                             (int(5*(1-t)+15*t), int(5*(1-t)+10*t), int(20*(1-t)+50*t)),
+                             (0, y), (WIDTH, y))
+        try:
+            fb2 = pygame.font.SysFont("Arial Black", 72, bold=True)
+        except Exception:
+            fb2 = pygame.font.Font(None, 86)
         t2 = fb2.render("MISSÃO CONCLUÍDA!", True, C_YELLOW)
-        missao_img.blit(t2, (WIDTH//2 - t2.get_width()//2, HEIGHT//2 - 100))
+        missao_img.blit(t2, (WIDTH//2 - t2.get_width()//2, HEIGHT//2 - 160))
+        print(f"[AVISO] missao_concluida.png não encontrado em: {missao_path}")
 
     jogar_btn_rect = get_jogar_button_rect()
 
