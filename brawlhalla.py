@@ -861,14 +861,8 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick):
         surf.blit(hint, (WIDTH // 2 - hint.get_width() // 2, HEIGHT - 40))
 
 
-# ─── NOVA TELA: TELA INICIAL COM capa.png ────────────────────────────────────
+# ─── TELA INICIAL COM capa.png ────────────────────────────────────────────────
 def get_jogar_button_rect():
-    """
-    Retorna o pygame.Rect do botão JOGAR mapeado para a resolução 1280x720.
-    Coordenadas obtidas por análise de pixels da imagem original (1672x941):
-      botão laranja: x=194-791, y=565-632  →  escalado para 1280x720: x=148-605, y=432-483
-    Adicionamos uma margem extra para facilitar o clique.
-    """
     x = 140
     y = 425
     w = 475
@@ -877,16 +871,11 @@ def get_jogar_button_rect():
 
 
 def draw_intro(surf, font_small, capa_img, tick, jogar_btn_rect):
-    """
-    Nova tela inicial: exibe capa.png em tela cheia.
-    Desenha um leve efeito de hover/pulse sobre a área do botão JOGAR.
-    """
     surf.blit(capa_img, (0, 0))
 
     mouse_pos = pygame.mouse.get_pos()
     hovering = jogar_btn_rect.collidepoint(mouse_pos)
 
-    # Efeito de brilho pulsante sobre o botão
     pulse = 0.4 + 0.35 * math.sin(tick * 0.08)
     alpha = int(pulse * 80) if not hovering else 140
     glow_surf = pygame.Surface((jogar_btn_rect.w + 20, jogar_btn_rect.h + 20), pygame.SRCALPHA)
@@ -897,27 +886,20 @@ def draw_intro(surf, font_small, capa_img, tick, jogar_btn_rect):
     surf.blit(glow_surf, (jogar_btn_rect.x - 10, jogar_btn_rect.y - 10))
 
     if hovering:
-        # Contorno branco quando hover
         pygame.draw.rect(surf, (255, 255, 255),
                          jogar_btn_rect.inflate(6, 6), 3, border_radius=28)
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
     else:
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
-    # Dica discreta no rodapé
     hint = font_small.render("Clique em JOGAR ou pressione ENTER", True, (220, 220, 220))
     shadow = font_small.render("Clique em JOGAR ou pressione ENTER", True, (0, 0, 0))
     surf.blit(shadow, (WIDTH // 2 - hint.get_width() // 2 + 1, HEIGHT - 28))
     surf.blit(hint,   (WIDTH // 2 - hint.get_width() // 2,     HEIGHT - 29))
 
 
-# ─── NOVA TELA: INSTRUÇÕES ────────────────────────────────────────────────────
+# ─── TELA DE INSTRUÇÕES ───────────────────────────────────────────────────────
 def draw_instructions(surf, font_title, font_small, font_big, tick):
-    """
-    Tela de instruções/controles que aparece após o JOGAR e antes da seleção
-    de personagens.
-    """
-    # Fundo com gradiente escuro
     for y in range(HEIGHT):
         t = y / HEIGHT
         pygame.draw.line(surf,
@@ -926,15 +908,12 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
                           int(25 * (1 - t) + 55 * t)),
                          (0, y), (WIDTH, y))
 
-    # Título
     title = font_title.render("COMO JOGAR", True, C_YELLOW)
     surf.blit(title, (WIDTH // 2 - title.get_width() // 2, 40))
 
-    # Linha decorativa
     pygame.draw.line(surf, C_YELLOW,
                      (WIDTH // 2 - 300, 110), (WIDTH // 2 + 300, 110), 2)
 
-    # Painéis lado a lado
     panels = [
         {
             "title": "JOGADOR 1",
@@ -969,31 +948,25 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
         px, py = panel["x"], 140
         col = panel["color"]
 
-        # Fundo do painel
         bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         bg.fill((*col, 25))
         surf.blit(bg, (px, py))
         pygame.draw.rect(surf, col, (px, py, panel_w, panel_h), 2, border_radius=12)
 
-        # Título do painel
         t = font_big.render(panel["title"], True, col)
         surf.blit(t, (px + panel_w // 2 - t.get_width() // 2, py + 14))
         pygame.draw.line(surf, col, (px + 20, py + 58), (px + panel_w - 20, py + 58), 1)
 
-        # Controles
         for idx, (action, key) in enumerate(panel["controls"]):
             row_y = py + 75 + idx * 50
-            # Ação
             act_s = font_small.render(action, True, (200, 200, 230))
             surf.blit(act_s, (px + 24, row_y))
-            # Fundo da tecla
             key_s = font_small.render(key, True, C_YELLOW)
             key_bg = pygame.Surface((key_s.get_width() + 16, key_s.get_height() + 6), pygame.SRCALPHA)
             key_bg.fill((255, 220, 50, 40))
             surf.blit(key_bg, (px + panel_w - key_s.get_width() - 28, row_y - 2))
             surf.blit(key_s, (px + panel_w - key_s.get_width() - 20, row_y))
 
-    # Dica geral
     tip_y = 510
     tips = [
         "• Empurre o adversário para fora da arena para marcar pontos",
@@ -1004,7 +977,6 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
         tip_s = font_small.render(tip, True, (180, 175, 220))
         surf.blit(tip_s, (WIDTH // 2 - tip_s.get_width() // 2, tip_y + i * 30))
 
-    # Botão "CONTINUAR"
     btn_w, btn_h = 340, 54
     btn_x = WIDTH // 2 - btn_w // 2
     btn_y = HEIGHT - 80
@@ -1029,7 +1001,7 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
     surf.blit(btn_text, (btn_x + btn_w // 2 - btn_text.get_width() // 2,
                           btn_y + btn_h // 2 - btn_text.get_height() // 2))
 
-    return btn_rect  # retorna o rect para detecção de clique
+    return btn_rect
 
 
 def draw_landscape_select(surf, font_title, font_small, font_big,
@@ -1079,25 +1051,113 @@ def draw_landscape_select(surf, font_title, font_small, font_big,
     surf.blit(instr, (WIDTH // 2 - instr.get_width() // 2, HEIGHT - 50))
 
 
-def draw_winner(surf, winner, font_title, font_small, win_particles):
-    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 160))
-    surf.blit(overlay, (0, 0))
+# ─── NOVA TELA DE VITÓRIA: MISSÃO CONCLUÍDA ──────────────────────────────────
+def draw_missao_concluida(surf, font_small, missao_img, winner, tick, win_particles):
+    """
+    Exibe a tela 'Missão Concluída' usando a imagem fornecida como fundo.
+    Retorna (reiniciar_rect, menu_rect) para detecção de cliques.
+    """
+    # Fundo: imagem missão concluída em tela cheia
+    surf.blit(missao_img, (0, 0))
 
+    # Partículas de celebração por cima (efeito visual extra)
     win_particles[:] = [p for p in win_particles if p.life > 0]
-
     for p in win_particles:
         p.update()
         p.draw(surf)
 
-    txt = font_title.render(f"{winner} VENCEU!", True, C_YELLOW)
-    surf.blit(txt, (WIDTH // 2 - txt.get_width() // 2, HEIGHT // 2 - 60))
+    # Nome do vencedor acima dos botões
+    winner_font_size = 36
+    try:
+        wfont = pygame.font.SysFont("Arial Black", winner_font_size, bold=True)
+    except Exception:
+        wfont = pygame.font.Font(None, winner_font_size + 10)
 
-    sub = font_small.render(
-        "R = reiniciar | M = menu | ESC = sair",
-        True, C_WHITE
-    )
-    surf.blit(sub, (WIDTH // 2 - sub.get_width() // 2, HEIGHT // 2 + 20))
+    winner_text = wfont.render(f"🏆  {winner} VENCEU!", True, C_YELLOW)
+    # Sombra do texto
+    shadow_text = wfont.render(f"🏆  {winner} VENCEU!", True, (0, 0, 0))
+    wx = WIDTH // 2 - winner_text.get_width() // 2
+    wy = 430
+    surf.blit(shadow_text, (wx + 2, wy + 2))
+    surf.blit(winner_text, (wx, wy))
+
+    # ── Botão REINICIAR (laranja, esquerda) ──────────────────────────────
+    btn_w, btn_h = 260, 62
+    gap = 40
+    total_btn_w = btn_w * 2 + gap
+    btn_start_x = WIDTH // 2 - total_btn_w // 2
+
+    reiniciar_rect = pygame.Rect(btn_start_x, 510, btn_w, btn_h)
+    menu_rect = pygame.Rect(btn_start_x + btn_w + gap, 510, btn_w, btn_h)
+
+    mouse_pos = pygame.mouse.get_pos()
+
+    # Botão REINICIAR
+    hover_r = reiniciar_rect.collidepoint(mouse_pos)
+    pulse_r = 0.85 + 0.15 * math.sin(tick * 0.1)
+    orange_base = (230, 150, 20)
+    orange_col = tuple(int(c * (1.15 if hover_r else pulse_r)) for c in orange_base)
+    orange_col = tuple(min(255, c) for c in orange_col)
+
+    # Sombra do botão
+    shad_r = pygame.Surface((btn_w + 6, btn_h + 6), pygame.SRCALPHA)
+    shad_r.fill((0, 0, 0, 100))
+    surf.blit(shad_r, (reiniciar_rect.x - 2, reiniciar_rect.y + 4))
+
+    pygame.draw.rect(surf, orange_col, reiniciar_rect, border_radius=32)
+    # Borda mais clara no topo (efeito 3D)
+    top_highlight = pygame.Surface((btn_w, btn_h // 2), pygame.SRCALPHA)
+    top_highlight.fill((255, 255, 255, 30))
+    surf.blit(top_highlight, (reiniciar_rect.x, reiniciar_rect.y))
+    pygame.draw.rect(surf, (255, 200, 80) if hover_r else (255, 180, 40),
+                     reiniciar_rect, 2, border_radius=32)
+
+    try:
+        btn_font = pygame.font.SysFont("Arial Black", 22, bold=True)
+    except Exception:
+        btn_font = pygame.font.Font(None, 28)
+
+    r_text = btn_font.render("↺  REINICIAR", True, (20, 10, 0))
+    surf.blit(r_text, (reiniciar_rect.centerx - r_text.get_width() // 2,
+                        reiniciar_rect.centery - r_text.get_height() // 2))
+
+    # Botão MENU (azul)
+    hover_m = menu_rect.collidepoint(mouse_pos)
+    pulse_m = 0.85 + 0.15 * math.sin(tick * 0.1 + 1.0)
+    blue_base = (30, 100, 210)
+    blue_col = tuple(int(c * (1.2 if hover_m else pulse_m)) for c in blue_base)
+    blue_col = tuple(min(255, c) for c in blue_col)
+
+    shad_m = pygame.Surface((btn_w + 6, btn_h + 6), pygame.SRCALPHA)
+    shad_m.fill((0, 0, 0, 100))
+    surf.blit(shad_m, (menu_rect.x - 2, menu_rect.y + 4))
+
+    pygame.draw.rect(surf, blue_col, menu_rect, border_radius=32)
+    top_highlight_m = pygame.Surface((btn_w, btn_h // 2), pygame.SRCALPHA)
+    top_highlight_m.fill((255, 255, 255, 30))
+    surf.blit(top_highlight_m, (menu_rect.x, menu_rect.y))
+    pygame.draw.rect(surf, (80, 180, 255) if hover_m else (60, 140, 255),
+                     menu_rect, 2, border_radius=32)
+
+    m_text = btn_font.render("⌂  MENU", True, C_WHITE)
+    surf.blit(m_text, (menu_rect.centerx - m_text.get_width() // 2,
+                        menu_rect.centery - m_text.get_height() // 2))
+
+    # Cursor
+    if hover_r or hover_m:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+    else:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+
+    # Dica de teclado
+    hint = font_small.render("R = reiniciar   |   M = menu   |   ESC = sair", True, (200, 200, 200))
+    shadow_hint = font_small.render("R = reiniciar   |   M = menu   |   ESC = sair", True, (0, 0, 0))
+    hx = WIDTH // 2 - hint.get_width() // 2
+    hy = HEIGHT - 28
+    surf.blit(shadow_hint, (hx + 1, hy + 1))
+    surf.blit(hint, (hx, hy))
+
+    return reiniciar_rect, menu_rect
 
 
 def main():
@@ -1137,13 +1197,26 @@ def main():
         capa_img = pygame.image.load(capa_path).convert_alpha()
         capa_img = pygame.transform.smoothscale(capa_img, (WIDTH, HEIGHT))
     else:
-        # Fallback: fundo escuro com texto caso o arquivo não seja encontrado
         capa_img = pygame.Surface((WIDTH, HEIGHT))
         capa_img.fill(C_DARK)
         fb = pygame.font.SysFont("Arial Black", 72, bold=True)
         t = fb.render("INSPER BRAWL", True, C_YELLOW)
         capa_img.blit(t, (WIDTH // 2 - t.get_width() // 2, HEIGHT // 2 - 60))
         print(f"[AVISO] capa.png não encontrado em: {capa_path}")
+
+    # ── Carrega a tela de missão concluída ────────────────────────────────
+    missao_path = os.path.join(base_dir, "imagens", "missao_concluida.png")
+    if os.path.exists(missao_path):
+        missao_img = pygame.image.load(missao_path).convert_alpha()
+        missao_img = pygame.transform.smoothscale(missao_img, (WIDTH, HEIGHT))
+    else:
+        # Fallback: fundo escuro se imagem não encontrada
+        missao_img = pygame.Surface((WIDTH, HEIGHT))
+        missao_img.fill((10, 10, 40))
+        fb2 = pygame.font.SysFont("Arial Black", 72, bold=True)
+        t2 = fb2.render("MISSÃO CONCLUÍDA!", True, C_YELLOW)
+        missao_img.blit(t2, (WIDTH // 2 - t2.get_width() // 2, HEIGHT // 2 - 100))
+        print(f"[AVISO] missao_concluida.png não encontrado em: {missao_path}")
 
     jogar_btn_rect = get_jogar_button_rect()
 
@@ -1180,11 +1253,15 @@ def main():
     p1, p2 = make_players()
     effects = []
     global_particles = []
-    state = "intro"          # estados: intro | instructions | char_select | landscape_select | game | win
+    state = "intro"
     winner = None
     win_particles = []
     tick = 0
-    instructions_btn_rect = pygame.Rect(0, 0, 0, 0)  # atualizado no draw
+    instructions_btn_rect = pygame.Rect(0, 0, 0, 0)
+
+    # Rects dos botões da tela de vitória (atualizados a cada frame no draw)
+    win_reiniciar_rect = pygame.Rect(0, 0, 0, 0)
+    win_menu_rect = pygame.Rect(0, 0, 0, 0)
 
     def spawn_win_particles(color):
         return [Particle(
@@ -1228,11 +1305,9 @@ def main():
                     else:
                         running = False
 
-                # ── Tela inicial ──────────────────────────────────────────
                 if state == "intro" and event.key == pygame.K_RETURN:
                     state = "instructions"
 
-                # ── Tela de instruções ────────────────────────────────────
                 elif state == "instructions" and event.key in (pygame.K_RETURN, pygame.K_SPACE):
                     state = "char_select"
                     css["p1_ready"] = False
@@ -1293,6 +1368,11 @@ def main():
                     css["p1_ready"] = False
                     css["p2_ready"] = False
                     css_ready_timer = 0
+                elif state == "win":
+                    if win_reiniciar_rect.collidepoint(mpos):
+                        reset_match()
+                    elif win_menu_rect.collidepoint(mpos):
+                        reset_to_char_select()
 
         if state == "char_select":
             if css["p1_ready"] and css["p2_ready"]:
@@ -1361,7 +1441,7 @@ def main():
             draw_landscape_select(surf, font_title, font_small, font_big,
                                   selected_landscape_idx, tick, bg_images, bg_cards)
 
-        elif state in ("game", "win"):
+        elif state == "game":
             draw_background(surf, current_landscape, bg_images)
             draw_platforms(surf, PLATFORMS, current_landscape)
             bar_col = LANDSCAPES[current_landscape]["death_bars"]
@@ -1374,8 +1454,11 @@ def main():
             for pg in global_particles:
                 pg.draw(surf)
             draw_hud(surf, p1, p2, font_big, font_small)
-            if state == "win":
-                draw_winner(surf, winner, font_title, font_small, win_particles)
+
+        elif state == "win":
+            win_reiniciar_rect, win_menu_rect = draw_missao_concluida(
+                surf, font_small, missao_img, winner, tick, win_particles
+            )
 
         pygame.display.flip()
 
