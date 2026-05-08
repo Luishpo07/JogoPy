@@ -42,21 +42,8 @@ SPRITE_CACHE = {}
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  LOCALIZAÇÃO ROBUSTA DA PASTA "imagens"
-#  Procura em vários lugares relativos ao script para funcionar independente
-#  de onde o arquivo .py esteja dentro da estrutura de pastas.
 # ══════════════════════════════════════════════════════════════════════════════
 def find_imagens_dir(script_path):
-    """
-    Tenta localizar a pasta 'imagens' a partir do diretório do script.
-    Verifica os seguintes caminhos (em ordem):
-      1. <script_dir>/imagens
-      2. <script_dir>/Anexos/imagens
-      3. <parent>/imagens
-      4. <parent>/Anexos/imagens
-      5. <grandparent>/imagens
-      6. <grandparent>/Anexos/imagens
-    Retorna o primeiro que existir, ou o caminho padrão como fallback.
-    """
     d = os.path.dirname(os.path.abspath(script_path))
     parent = os.path.dirname(d)
     grandparent = os.path.dirname(parent)
@@ -75,7 +62,6 @@ def find_imagens_dir(script_path):
             print(f"[INFO] Pasta 'imagens' encontrada em: {path}")
             return path
 
-    # Fallback: caminho padrão mesmo que não exista (vai gerar erro descritivo depois)
     fallback = os.path.join(d, "imagens")
     print(f"[AVISO] Pasta 'imagens' não encontrada. Tentativas:")
     for c in candidates:
@@ -84,8 +70,9 @@ def find_imagens_dir(script_path):
     return fallback
 
 
-def load_sprites(base_dir):
-    folder = os.path.join(base_dir, "Personagem1")
+def load_sprites(imagens_dir):
+    # CORRIGIDO: usa imagens_dir em vez de base_dir
+    folder = os.path.join(imagens_dir, "Personagem1")
 
     if not os.path.isdir(folder):
         print(f"[SPRITE] Pasta não encontrada: {folder}")
@@ -695,6 +682,7 @@ def draw_platforms(surf, platforms, landscape_name):
 #  TELA DE SELEÇÃO DE PERSONAGEM
 # ══════════════════════════════════════════════════════════════════════════════
 
+# CORRIGIDO: removido conflito de merge Git — mantida a versão correta (HEAD)
 PED_LEFT_CX  = 455
 PED_RIGHT_CX = 780
 PED_TOP_Y    = 588
@@ -991,8 +979,6 @@ def _draw_player_info_panel(surf, char, title, p_label, p_col, is_ready,
 
 # ─── TELA INICIAL COM capa.png ────────────────────────────────────────────────
 def get_jogar_button_rect():
-    # Coordenadas calibradas para a posição real do botão JOGAR na capa.png
-    # (imagem original 1672x941 escalada para 1280x720)
     return pygame.Rect(142, 367, 392, 136)
 
 
@@ -1124,16 +1110,13 @@ def draw_landscape_select(surf, font_title, font_small, font_big,
 
 # ─── TELA DE VITÓRIA: MISSÃO CONCLUÍDA ───────────────────────────────────────
 def draw_missao_concluida(surf, font_small, missao_img, winner, tick, win_particles):
-    # Fundo: imagem missao_concluida.png em tela cheia
     surf.blit(missao_img, (0, 0))
 
-    # Partículas de celebração
     win_particles[:] = [p for p in win_particles if p.life > 0]
     for p in win_particles:
         p.update()
         p.draw(surf)
 
-    # Nome do vencedor
     try:
         wfont = pygame.font.SysFont("Arial Black", 36, bold=True)
     except Exception:
@@ -1145,7 +1128,6 @@ def draw_missao_concluida(surf, font_small, missao_img, winner, tick, win_partic
     surf.blit(shadow_text, (wx + 2, 432))
     surf.blit(winner_text, (wx,     430))
 
-    # Botões REINICIAR e MENU
     btn_w, btn_h = 260, 62
     gap = 40
     btn_start_x = WIDTH // 2 - (btn_w * 2 + gap) // 2
@@ -1205,13 +1187,10 @@ def main():
         font_big   = pygame.font.Font(None, 52)
         font_small = pygame.font.Font(None, 28)
 
-    # ── Localiza a pasta "imagens" de forma robusta ────────────────────────
-    # Passa __file__ para encontrar imagens mesmo que o script esteja
-    # numa pasta diferente de "imagens" (ex: Anexos/imagens)
-    base_dir   = os.path.dirname(os.path.abspath(__file__))
+    # CORRIGIDO: passa __file__ para find_imagens_dir e usa imagens_dir em load_sprites
     imagens_dir = find_imagens_dir(__file__)
 
-    sprites_ok = load_sprites(base_dir)
+    sprites_ok = load_sprites(imagens_dir)
     if not sprites_ok:
         print("[AVISO] Sprites não encontrados — usando visual geométrico.")
         for c in CHARACTERS:
@@ -1258,14 +1237,13 @@ def main():
             pygame.draw.line(charsel_bg, (r, g, b), (0, y), (WIDTH, y))
         print(f"[AVISO] selecaopersonagem.png não encontrado em: {charsel_bg_path}")
 
-    # Missão concluída — caminho usa imagens_dir
+    # Missão concluída
     missao_path = os.path.join(imagens_dir, "missao_concluida.png")
     if os.path.exists(missao_path):
         missao_img = pygame.transform.smoothscale(
             pygame.image.load(missao_path).convert_alpha(), (WIDTH, HEIGHT))
         print("[OK] missao_concluida.png carregado.")
     else:
-        # Fallback com gradiente escuro e texto
         missao_img = pygame.Surface((WIDTH, HEIGHT))
         for y in range(HEIGHT):
             t = y / HEIGHT
