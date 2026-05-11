@@ -60,18 +60,13 @@ def find_imagens_dir(script_path):
             return path
 
     fallback = os.path.join(d, "imagens")
-    print(f"[AVISO] Pasta 'imagens' não encontrada. Tentativas:")
-    for c in candidates:
-        print(f"        {c}")
-    print(f"        Usando fallback: {fallback}")
+    print(f"[AVISO] Pasta 'imagens' não encontrada.")
     return fallback
 
 
 def load_sprites(imagens_dir):
     folder = os.path.join(imagens_dir, "Personagem1")
-
     if not os.path.isdir(folder):
-        print(f"[SPRITE] Pasta não encontrada: {folder}")
         return False
 
     run_files = [
@@ -84,9 +79,7 @@ def load_sprites(imagens_dir):
         return int(digits) if digits else 10**9
 
     run_files.sort(key=run_sort_key)
-
     if not run_files:
-        print(f"[SPRITE] Nenhum frame run_*.png encontrado em: {folder}")
         return False
 
     run_frames = []
@@ -101,14 +94,513 @@ def load_sprites(imagens_dir):
     if not os.path.exists(idle_path):
         return False
     idle_img = pygame.image.load(idle_path).convert_alpha()
-
     SPRITE_CACHE["p1_walk"] = run_frames
     SPRITE_CACHE["p1_idle"] = idle_img
-    print(f"[SPRITE] Carregados {len(run_frames)} frames de caminhada e idle_01.png com sucesso.")
     return True
 
 
+# ─────────────────────────────────────────────
+#  DESENHO DE PERSONAGENS (funções auxiliares)
+# ─────────────────────────────────────────────
+
+def draw_limb(surf, color, start, end, width):
+    """Desenha um membro com linha grossa e caps arredondadas."""
+    pygame.draw.line(surf, color, start, end, width)
+    pygame.draw.circle(surf, color, start, width // 2)
+    pygame.draw.circle(surf, color, end, width // 2)
+
+
+def _draw_boxer(surf, bx, by, w, h, color, dark_color, accent, facing, anim_frame,
+                attack_timer, attack_type, squash_x, squash_y):
+    """Lutador de boxe com luvas grandes e animação de jab/uppercut."""
+    body_rect = pygame.Rect(bx, by, w, h)
+
+    # corpo (shorts listrados)
+    pygame.draw.rect(surf, dark_color, body_rect, border_radius=9)
+    inner = body_rect.inflate(-6, -6)
+    pygame.draw.rect(surf, color, inner, border_radius=7)
+
+    # shorts com listras
+    shorts_rect = pygame.Rect(bx + 3, by + h // 2, w - 6, h // 2 - 3)
+    pygame.draw.rect(surf, dark_color, shorts_rect, border_radius=4)
+    for i in range(3):
+        sx = shorts_rect.x + i * (shorts_rect.w // 3)
+        pygame.draw.line(surf, accent,
+                         (sx, shorts_rect.y), (sx, shorts_rect.bottom), 2)
+
+    # cabeça com capacete
+    head_cx = bx + w // 2 + (5 if facing == 1 else -5)
+    head_cy = by - 16
+    pygame.draw.circle(surf, dark_color, (head_cx, head_cy), 18)
+    pygame.draw.circle(surf, color, (head_cx, head_cy), 15)
+    # viseira do capacete
+    pygame.draw.arc(surf, accent,
+                    (head_cx - 12, head_cy - 10, 24, 16),
+                    math.pi * 0.1, math.pi * 0.9, 3)
+    # olho
+    ex = head_cx + (7 if facing == 1 else -7)
+    pygame.draw.circle(surf, C_WHITE, (ex, head_cy - 1), 4)
+    pygame.draw.circle(surf, (20, 20, 20), (ex + facing, head_cy - 1), 2)
+
+    # pernas com animação
+    leg_swing = int(math.sin(anim_frame * 0.22) * 12) if attack_timer == 0 else 0
+    pygame.draw.line(surf, dark_color, (bx + w // 3, by + h),
+                     (bx + w // 3 - leg_swing, by + h + 14), 6)
+    pygame.draw.line(surf, dark_color, (bx + 2 * w // 3, by + h),
+                     (bx + 2 * w // 3 + leg_swing, by + h + 14), 6)
+    # tênis
+    shoe_off = -leg_swing
+    pygame.draw.ellipse(surf, accent,
+                        (bx + w // 3 - leg_swing - 8, by + h + 14, 16, 7))
+    pygame.draw.ellipse(surf, accent,
+                        (bx + 2 * w // 3 + leg_swing - 8, by + h + 14, 16, 7))
+
+    # LUVAS
+    glove_r = 11
+    if attack_timer > 0:
+        if attack_type == "light":  # jab reto
+            jab_ext = int(22 * min(1, attack_timer / 9))
+            gx = bx + (w + jab_ext) if facing == 1 else bx - jab_ext
+            gy = by + h // 3
+            draw_limb(surf, dark_color, (bx + w // 2, gy), (gx, gy), 7)
+            pygame.draw.circle(surf, C_RED, (gx, gy), glove_r + 2)
+            pygame.draw.circle(surf, accent, (gx, gy), glove_r)
+        else:  # uppercut
+            upx = bx + (w + 10) if facing == 1 else bx - 10
+            upy = by + h // 3 - int(20 * min(1, attack_timer / 14))
+            draw_limb(surf, dark_color, (bx + w // 2, by + h // 2), (upx, upy), 7)
+            pygame.draw.circle(surf, C_YELLOW, (upx, upy), glove_r + 3)
+            pygame.draw.circle(surf, accent, (upx, upy), glove_r)
+    else:
+        # guarda alta em idle
+        bob = math.sin(anim_frame * 0.08) * 4
+        for side, sign in [(1, 1), (-1, -1)]:
+            gx = bx + (w - 2 if sign == 1 else 4)
+            gy = int(by + h // 3 + bob * sign)
+            draw_limb(surf, dark_color, (bx + w // 2, by + h // 2), (gx, gy), 6)
+            pygame.draw.circle(surf, C_RED, (gx, gy), glove_r + 1)
+            pygame.draw.circle(surf, accent, (gx, gy), glove_r - 1)
+
+
+def _draw_knight(surf, bx, by, w, h, color, dark_color, accent, facing, anim_frame,
+                 attack_timer, attack_type, squash_x, squash_y):
+    """Cavaleiro com armadura dourada, escudo e espada."""
+    body_rect = pygame.Rect(bx, by, w, h)
+    pygame.draw.rect(surf, dark_color, body_rect, border_radius=8)
+    pygame.draw.rect(surf, color, body_rect.inflate(-4, -4), border_radius=6)
+
+    # peito da armadura (placas)
+    chest_rect = pygame.Rect(bx + 4, by + 4, w - 8, h // 2 - 4)
+    pygame.draw.rect(surf, accent, chest_rect, border_radius=5)
+    pygame.draw.line(surf, dark_color,
+                     (chest_rect.centerx, chest_rect.top),
+                     (chest_rect.centerx, chest_rect.bottom), 2)
+
+    # cabeça com elmo
+    head_cx = bx + w // 2
+    head_cy = by - 18
+    pygame.draw.circle(surf, dark_color, (head_cx, head_cy), 20)
+    pygame.draw.circle(surf, color, (head_cx, head_cy), 17)
+    # elmo crista
+    pygame.draw.polygon(surf, accent, [
+        (head_cx - 8, head_cy - 17),
+        (head_cx, head_cy - 30),
+        (head_cx + 8, head_cy - 17),
+    ])
+    # viseira
+    vis_rect = pygame.Rect(head_cx - 12, head_cy - 6, 24, 10)
+    pygame.draw.rect(surf, dark_color, vis_rect, border_radius=3)
+    for i in range(3):
+        pygame.draw.line(surf, (80, 80, 80),
+                         (head_cx - 10 + i * 10, head_cy - 5),
+                         (head_cx - 10 + i * 10, head_cy + 3), 2)
+
+    # pernas com armadura
+    leg_sw = int(math.sin(anim_frame * 0.18) * 10) if attack_timer == 0 else 0
+    for ox, sw in [(w // 3, -leg_sw), (2 * w // 3, leg_sw)]:
+        pygame.draw.line(surf, dark_color,
+                         (bx + ox, by + h), (bx + ox + sw, by + h + 13), 7)
+        pygame.draw.circle(surf, accent, (bx + ox + sw, by + h + 13), 5)
+
+    # ESCUDO (lado oposto ao facing)
+    shield_side = -1 if facing == 1 else 1
+    shx = bx + (0 if facing == 1 else w)
+    shy = by + h // 4
+    shield_bob = int(math.sin(anim_frame * 0.1) * 3)
+    pygame.draw.ellipse(surf, dark_color,
+                        (shx + shield_side * 8 - 12, shy - 14 + shield_bob, 28, 32))
+    pygame.draw.ellipse(surf, (200, 160, 20),
+                        (shx + shield_side * 8 - 10, shy - 12 + shield_bob, 24, 28))
+    pygame.draw.ellipse(surf, accent,
+                        (shx + shield_side * 8 - 6, shy - 8 + shield_bob, 16, 20))
+    # brasão no escudo
+    pygame.draw.line(surf, dark_color,
+                     (shx + shield_side * 8 + 2, shy - 8 + shield_bob),
+                     (shx + shield_side * 8 + 2, shy + 10 + shield_bob), 2)
+
+    # ESPADA
+    if attack_timer > 0:
+        slash_prog = 1 - attack_timer / (18 if attack_type == "light" else 28)
+        if attack_type == "light":
+            angle = -0.8 + slash_prog * 1.8
+        else:
+            angle = 0.4 - slash_prog * 2.2
+        sword_len = 44 if attack_type == "light" else 58
+        base_x = bx + (w + 4) if facing == 1 else bx - 4
+        base_y = by + h // 3
+        tip_x = int(base_x + math.cos(angle) * sword_len * facing)
+        tip_y = int(base_y + math.sin(angle) * sword_len)
+        draw_limb(surf, (180, 170, 200), (base_x, base_y), (tip_x, tip_y), 5)
+        # brilho da espada
+        glow_col = C_YELLOW if attack_type == "heavy" else C_WHITE
+        pygame.draw.circle(surf, glow_col, (tip_x, tip_y), 5)
+    else:
+        sword_angle = math.sin(anim_frame * 0.07) * 0.15
+        sx_base = bx + (w if facing == 1 else 0)
+        sy_base = by + h // 3
+        sx_tip = int(sx_base + math.cos(sword_angle) * 36 * facing)
+        sy_tip = int(sy_base + math.sin(sword_angle) * 36)
+        draw_limb(surf, (180, 170, 200), (sx_base, sy_base), (sx_tip, sy_tip), 4)
+        pygame.draw.circle(surf, C_WHITE, (sx_tip, sy_tip), 3)
+
+
+def _draw_archer(surf, bx, by, w, h, color, dark_color, accent, facing, anim_frame,
+                 attack_timer, attack_type, squash_x, squash_y):
+    """Arqueiro ágil com arco e flechas."""
+    body_rect = pygame.Rect(bx, by, w, h)
+    pygame.draw.rect(surf, dark_color, body_rect, border_radius=10)
+    inner = body_rect.inflate(-6, -6)
+    pygame.draw.rect(surf, color, inner, border_radius=8)
+
+    # detalhes da roupa (colete de couro)
+    vest_rect = pygame.Rect(bx + 5, by + 4, w - 10, h // 2)
+    pygame.draw.rect(surf, dark_color, vest_rect, border_radius=5)
+    pygame.draw.rect(surf, accent, vest_rect.inflate(-4, -4), 1, border_radius=4)
+
+    # cabeça com capuz
+    head_cx = bx + w // 2 + (4 if facing == 1 else -4)
+    head_cy = by - 15
+    pygame.draw.circle(surf, dark_color, (head_cx, head_cy), 17)
+    pygame.draw.circle(surf, color, (head_cx, head_cy), 14)
+    # capuz
+    hood_pts = [
+        (head_cx - 14, head_cy + 5),
+        (head_cx - 10, head_cy - 25),
+        (head_cx + (12 if facing == 1 else -12), head_cy - 25),
+        (head_cx + 14, head_cy + 5),
+    ]
+    pygame.draw.polygon(surf, dark_color, hood_pts)
+    pygame.draw.circle(surf, color, (head_cx, head_cy), 12)
+    ex = head_cx + (6 if facing == 1 else -6)
+    pygame.draw.circle(surf, C_WHITE, (ex, head_cy - 2), 4)
+    pygame.draw.circle(surf, (20, 20, 20), (ex + facing, head_cy - 2), 2)
+
+    # pernas
+    leg_sw = int(math.sin(anim_frame * 0.22) * 11) if attack_timer == 0 else 0
+    pygame.draw.line(surf, dark_color, (bx + w // 3, by + h),
+                     (bx + w // 3 - leg_sw, by + h + 12), 5)
+    pygame.draw.line(surf, dark_color, (bx + 2 * w // 3, by + h),
+                     (bx + 2 * w // 3 + leg_sw, by + h + 12), 5)
+
+    # ARCO
+    bow_x = bx + (w + 2) if facing == 1 else bx - 2
+    bow_y = by + h // 3
+    bow_facing = facing
+
+    if attack_timer > 0:
+        draw_prog = min(1.0, attack_timer / 12)
+        # arco esticado
+        curve_off = int(14 * draw_prog)
+        bow_pts = []
+        for i in range(8):
+            t = i / 7
+            cy2 = bow_y - 24 + int(48 * t)
+            cx2 = bow_x + int(curve_off * bow_facing * (1 - abs(2*t-1)))
+            bow_pts.append((cx2, cy2))
+        if len(bow_pts) >= 2:
+            pygame.draw.lines(surf, accent, False, bow_pts, 3)
+        # corda esticada
+        pull_x = bow_x - bow_facing * int(18 * draw_prog)
+        pygame.draw.line(surf, C_WHITE, (bow_x, bow_y - 24),
+                         (pull_x, bow_y), 1)
+        pygame.draw.line(surf, C_WHITE, (bow_x, bow_y + 24),
+                         (pull_x, bow_y), 1)
+        # flecha na corda
+        arr_tip_x = bow_x + bow_facing * 30
+        pygame.draw.line(surf, (200, 170, 100),
+                         (pull_x, bow_y), (arr_tip_x, bow_y), 2)
+        pygame.draw.polygon(surf, accent, [
+            (arr_tip_x, bow_y),
+            (arr_tip_x - bow_facing * 8, bow_y - 4),
+            (arr_tip_x - bow_facing * 8, bow_y + 4),
+        ])
+    else:
+        # arco em idle com leve bob
+        bob2 = math.sin(anim_frame * 0.08) * 3
+        for i in range(7):
+            t = i / 6
+            cy2 = bow_y - 20 + int(40 * t) + int(bob2)
+            cx2 = bow_x + int(4 * bow_facing * (1 - abs(2*t-1)))
+            if i > 0:
+                py_prev = bow_y - 20 + int(40 * (i-1)/6) + int(bob2)
+                px_prev = bow_x + int(4 * bow_facing * (1 - abs(2*(i-1)/6-1)))
+                pygame.draw.line(surf, accent, (px_prev, py_prev), (cx2, cy2), 3)
+        pygame.draw.line(surf, C_WHITE,
+                         (bow_x, bow_y - 20 + int(bob2)),
+                         (bow_x, bow_y + 20 + int(bob2)), 1)
+
+
+def _draw_reaper(surf, bx, by, w, h, color, dark_color, accent, facing, anim_frame,
+                 attack_timer, attack_type, squash_x, squash_y):
+    """Ceifador com foice mágica e manto sombrio."""
+    body_rect = pygame.Rect(bx, by, w, h)
+    # manto (mais largo embaixo)
+    cloak_pts = [
+        (bx - 4, by + h + 10),
+        (bx + w + 4, by + h + 10),
+        (bx + w + 2, by + h // 2),
+        (bx + w - 2, by),
+        (bx + 2, by),
+        (bx - 2, by + h // 2),
+    ]
+    pygame.draw.polygon(surf, dark_color, cloak_pts)
+    pygame.draw.rect(surf, color, body_rect.inflate(-8, -10), border_radius=8)
+
+    # borda do manto com brilho
+    pygame.draw.lines(surf, accent, False, cloak_pts, 2)
+
+    # cabeça com capuz sombrio
+    head_cx = bx + w // 2
+    head_cy = by - 14
+    pygame.draw.circle(surf, dark_color, (head_cx, head_cy), 19)
+    # rosto sombrio
+    pygame.draw.circle(surf, (5, 5, 15), (head_cx, head_cy), 14)
+    # olhos brilhantes
+    for ex_off in [-6, 6]:
+        pygame.draw.circle(surf, accent, (head_cx + ex_off, head_cy - 1), 4)
+        pygame.draw.circle(surf, C_WHITE, (head_cx + ex_off, head_cy - 1), 2)
+    # ponta do capuz
+    pygame.draw.polygon(surf, dark_color, [
+        (head_cx - 14, head_cy - 8),
+        (head_cx, head_cy - 36),
+        (head_cx + 14, head_cy - 8),
+    ])
+
+    # "pernas" do manto flutuando
+    float_bob = int(math.sin(anim_frame * 0.12) * 5)
+    for ox in [w // 3, 2 * w // 3]:
+        wave = int(math.sin(anim_frame * 0.15 + ox) * 6)
+        pygame.draw.line(surf, dark_color,
+                         (bx + ox, by + h),
+                         (bx + ox + wave, by + h + 10 + float_bob), 6)
+
+    # FOICE
+    scythe_base_x = bx + (w if facing == 1 else 0)
+    scythe_base_y = by + h // 4
+
+    if attack_timer > 0:
+        slash_t = attack_timer / (18 if attack_type == "light" else 28)
+        if attack_type == "light":
+            rot = -1.0 + (1 - slash_t) * 2.5
+        else:
+            rot = 1.2 - (1 - slash_t) * 3.0
+        # cabo da foice
+        handle_len = 50
+        hx2 = int(scythe_base_x + math.cos(rot) * handle_len * facing)
+        hy2 = int(scythe_base_y + math.sin(rot) * handle_len)
+        draw_limb(surf, (100, 80, 130), (scythe_base_x, scythe_base_y), (hx2, hy2), 4)
+        # lâmina curva
+        blade_pts = []
+        for i in range(10):
+            t = i / 9
+            br = rot + t * math.pi * 0.7 * facing
+            blen = 32
+            bpx = hx2 + int(math.cos(br) * blen * facing)
+            bpy = hy2 + int(math.sin(br) * blen)
+            blade_pts.append((bpx, bpy))
+        if len(blade_pts) >= 2:
+            pygame.draw.lines(surf, accent, False, blade_pts, 3)
+            # brilho na ponta
+            pygame.draw.circle(surf, accent, blade_pts[-1], 4)
+    else:
+        idle_sway = math.sin(anim_frame * 0.07) * 0.2
+        handle_len = 45
+        hx2 = int(scythe_base_x + math.cos(idle_sway) * handle_len * facing)
+        hy2 = int(scythe_base_y + math.sin(idle_sway) * handle_len + 10)
+        draw_limb(surf, (100, 80, 130), (scythe_base_x, scythe_base_y), (hx2, hy2), 4)
+        blade_pts = []
+        for i in range(8):
+            t = i / 7
+            br = idle_sway + t * math.pi * 0.6 * facing
+            bpx = hx2 + int(math.cos(br) * 28 * facing)
+            bpy = hy2 + int(math.sin(br) * 28)
+            blade_pts.append((bpx, bpy))
+        if len(blade_pts) >= 2:
+            pygame.draw.lines(surf, accent, False, blade_pts, 2)
+
+
+def _draw_lancer(surf, bx, by, w, h, color, dark_color, accent, facing, anim_frame,
+                 attack_timer, attack_type, squash_x, squash_y):
+    """Guerreiro com lança/tridente aquático."""
+    body_rect = pygame.Rect(bx, by, w, h)
+    pygame.draw.rect(surf, dark_color, body_rect, border_radius=8)
+    pygame.draw.rect(surf, color, body_rect.inflate(-6, -6), border_radius=6)
+
+    # detalhes de armadura de escamas
+    for row in range(3):
+        for col in range(2):
+            sx = bx + 6 + col * (w // 2 - 6)
+            sy = by + 8 + row * 12
+            pygame.draw.ellipse(surf, accent, (sx, sy, 14, 10))
+            pygame.draw.ellipse(surf, dark_color, (sx, sy, 14, 10), 1)
+
+    # cabeça
+    head_cx = bx + w // 2 + (4 if facing == 1 else -4)
+    head_cy = by - 16
+    pygame.draw.circle(surf, dark_color, (head_cx, head_cy), 18)
+    pygame.draw.circle(surf, color, (head_cx, head_cy), 15)
+    # coroa/capacete aquático
+    for i, off in enumerate([-8, 0, 8]):
+        tip_h = 12 if i == 1 else 8
+        pygame.draw.polygon(surf, accent, [
+            (head_cx + off - 4, head_cy - 15),
+            (head_cx + off, head_cy - 15 - tip_h),
+            (head_cx + off + 4, head_cy - 15),
+        ])
+    ex = head_cx + (6 if facing == 1 else -6)
+    pygame.draw.circle(surf, C_WHITE, (ex, head_cy - 2), 4)
+    pygame.draw.circle(surf, (20, 20, 20), (ex + facing, head_cy - 2), 2)
+
+    # pernas
+    leg_sw = int(math.sin(anim_frame * 0.2) * 10) if attack_timer == 0 else 0
+    pygame.draw.line(surf, dark_color, (bx + w // 3, by + h),
+                     (bx + w // 3 - leg_sw, by + h + 13), 6)
+    pygame.draw.line(surf, dark_color, (bx + 2 * w // 3, by + h),
+                     (bx + 2 * w // 3 + leg_sw, by + h + 13), 6)
+
+    # TRIDENTE / LANÇA
+    lance_base_x = bx + (w + 4) if facing == 1 else bx - 4
+    lance_base_y = by + h // 3
+
+    if attack_timer > 0:
+        thrust = int(28 * min(1.0, attack_timer / 10)) if attack_type == "light" else 0
+        spin = (1 - attack_timer / 28) * math.pi * 2 if attack_type == "heavy" else 0
+        lance_len = 55
+        tip_x = int(lance_base_x + (lance_len + thrust) * facing * math.cos(spin))
+        tip_y = int(lance_base_y + lance_len * 0.15 * math.sin(spin))
+        draw_limb(surf, (100, 140, 200), (lance_base_x, lance_base_y), (tip_x, tip_y), 4)
+        # pontas do tridente
+        for ang_off in [-0.18, 0, 0.18]:
+            px2 = int(tip_x + math.cos(ang_off) * 14 * facing)
+            py2 = int(tip_y + math.sin(ang_off) * 14)
+            draw_limb(surf, accent, (tip_x, tip_y), (px2, py2), 3)
+    else:
+        bob2 = math.sin(anim_frame * 0.08) * 3
+        lance_len = 52
+        tip_x = int(lance_base_x + lance_len * facing)
+        tip_y = int(lance_base_y + bob2)
+        draw_limb(surf, (100, 140, 200), (lance_base_x, lance_base_y), (tip_x, tip_y), 4)
+        for ang_off in [-0.2, 0, 0.2]:
+            px2 = int(tip_x + math.cos(ang_off) * 12 * facing)
+            py2 = int(tip_y + math.sin(ang_off) * 12)
+            draw_limb(surf, accent, (tip_x, tip_y), (px2, py2), 3)
+
+
+def _draw_bear(surf, bx, by, w, h, color, dark_color, accent, facing, anim_frame,
+               attack_timer, attack_type, squash_x, squash_y):
+    """Urso guerreiro com garras e pelagem animada."""
+    body_rect = pygame.Rect(bx, by, w, h)
+
+    # corpo redondo e peludo
+    pygame.draw.ellipse(surf, dark_color, body_rect.inflate(6, 0))
+    pygame.draw.ellipse(surf, color, body_rect.inflate(0, -4))
+
+    # textura de pele (linhas de pelo)
+    for i in range(0, w, 6):
+        fur_h = int(math.sin((i + anim_frame * 0.5) * 0.4) * 3) + 4
+        pygame.draw.line(surf, dark_color,
+                         (bx + i, by + 4), (bx + i, by + 4 + fur_h), 1)
+
+    # barriga mais clara
+    belly_rect = pygame.Rect(bx + w // 4, by + h // 3, w // 2, h // 2)
+    pygame.draw.ellipse(surf, accent, belly_rect)
+
+    # cabeça de urso
+    head_cx = bx + w // 2 + (3 if facing == 1 else -3)
+    head_cy = by - 16
+    pygame.draw.circle(surf, dark_color, (head_cx, head_cy), 22)
+    pygame.draw.circle(surf, color, (head_cx, head_cy), 19)
+
+    # focinho
+    muzzle_cx = head_cx + (5 if facing == 1 else -5)
+    pygame.draw.ellipse(surf, accent,
+                        (muzzle_cx - 9, head_cy - 2, 18, 12))
+    pygame.draw.circle(surf, dark_color, (muzzle_cx, head_cy + 1), 3)  # nariz
+
+    # orelhas
+    for ear_off in [-14, 14]:
+        ex2 = head_cx + ear_off
+        ey2 = head_cy - 19
+        pygame.draw.circle(surf, dark_color, (ex2, ey2), 7)
+        pygame.draw.circle(surf, accent, (ex2, ey2), 4)
+
+    # olho
+    ex = head_cx + (8 if facing == 1 else -8)
+    pygame.draw.circle(surf, C_WHITE, (ex, head_cy - 4), 4)
+    pygame.draw.circle(surf, (20, 20, 20), (ex + facing, head_cy - 4), 2)
+    # brilho do olho
+    pygame.draw.circle(surf, C_WHITE, (ex + facing - 1, head_cy - 5), 1)
+
+    # pernas
+    leg_sw = int(math.sin(anim_frame * 0.18) * 9) if attack_timer == 0 else 0
+    for ox, sw in [(w // 3 - 2, -leg_sw), (2 * w // 3 + 2, leg_sw)]:
+        draw_limb(surf, dark_color, (bx + ox, by + h - 2),
+                  (bx + ox + sw, by + h + 12), 8)
+        pygame.draw.ellipse(surf, dark_color,
+                            (bx + ox + sw - 9, by + h + 10, 18, 8))
+
+    # GARRAS / BRAÇOS
+    if attack_timer > 0:
+        if attack_type == "light":  # garra rápida
+            claw_prog = min(1.0, attack_timer / 9)
+            claw_ext = int(20 * claw_prog)
+            cx2 = bx + (w + claw_ext) if facing == 1 else bx - claw_ext
+            cy2 = by + h // 3
+            draw_limb(surf, dark_color, (bx + w // 2, cy2), (cx2, cy2), 9)
+            # 3 garras
+            for ang in [-0.3, 0, 0.3]:
+                gx2 = int(cx2 + math.cos(ang) * 16 * facing)
+                gy2 = int(cy2 + math.sin(ang) * 16)
+                draw_limb(surf, (200, 200, 220), (cx2, cy2), (gx2, gy2), 3)
+        else:  # slam com as duas patas
+            slam_y = by + h // 2 + int(20 * min(1.0, 1 - attack_timer / 14))
+            for side in [-1, 1]:
+                cx2 = bx + w // 2 + side * (w // 2 + 8)
+                draw_limb(surf, dark_color, (bx + w // 2, by + h // 3),
+                          (cx2, slam_y), 9)
+                for ang in [-0.35, 0, 0.35]:
+                    gx2 = int(cx2 + math.cos(ang) * 14 * side)
+                    gy2 = int(slam_y + math.sin(ang) * 14)
+                    draw_limb(surf, (200, 200, 220), (cx2, slam_y), (gx2, gy2), 3)
+    else:
+        arm_bob = math.sin(anim_frame * 0.09) * 5
+        for side in [-1, 1]:
+            ax = bx + w // 2 + side * (w // 2 + 2)
+            ay = int(by + h // 3 + arm_bob * side)
+            draw_limb(surf, dark_color, (bx + w // 2, by + h // 3), (ax, ay), 8)
+            # garras idle
+            for ang in [-0.3, 0, 0.3]:
+                gx2 = int(ax + math.cos(ang) * 10 * side)
+                gy2 = int(ay + math.sin(ang) * 10)
+                draw_limb(surf, (200, 200, 220), (ax, ay), (gx2, gy2), 2)
+
+
+# ─────────────────────────────────────────────
+#  DADOS DOS PERSONAGENS
+# ─────────────────────────────────────────────
+
 CHARACTERS = [
+    # ── PERSONAGENS ORIGINAIS ─────────────────
     {
         "name": "SOMBRA",
         "color": (180, 100, 255),
@@ -124,6 +616,7 @@ CHARACTERS = [
         "light_dmg": 8, "heavy_dmg": 16, "light_kb": 9, "heavy_kb": 18,
         "accent": (210, 160, 255),
         "use_sprite": True,
+        "draw_fn": None,
     },
     {
         "name": "TITAN",
@@ -140,6 +633,7 @@ CHARACTERS = [
         "light_dmg": 6, "heavy_dmg": 18, "light_kb": 6, "heavy_kb": 20,
         "accent": (150, 210, 255),
         "use_sprite": False,
+        "draw_fn": None,
     },
     {
         "name": "PHANTOM",
@@ -156,6 +650,7 @@ CHARACTERS = [
         "light_dmg": 8, "heavy_dmg": 12, "light_kb": 9, "heavy_kb": 14,
         "accent": (200, 140, 255),
         "use_sprite": False,
+        "draw_fn": None,
     },
     {
         "name": "INFERNO",
@@ -172,6 +667,7 @@ CHARACTERS = [
         "light_dmg": 9, "heavy_dmg": 20, "light_kb": 10, "heavy_kb": 22,
         "accent": (255, 160, 60),
         "use_sprite": False,
+        "draw_fn": None,
     },
     {
         "name": "VORTEX",
@@ -188,6 +684,7 @@ CHARACTERS = [
         "light_dmg": 7, "heavy_dmg": 11, "light_kb": 12, "heavy_kb": 16,
         "accent": (80, 240, 200),
         "use_sprite": False,
+        "draw_fn": None,
     },
     {
         "name": "GOLEM",
@@ -204,6 +701,111 @@ CHARACTERS = [
         "light_dmg": 10, "heavy_dmg": 24, "light_kb": 7, "heavy_kb": 26,
         "accent": (210, 180, 100),
         "use_sprite": False,
+        "draw_fn": None,
+    },
+
+    # ── NOVOS PERSONAGENS (inspirados no Brawlhalla) ──────────────────
+    {
+        "name": "KNOCKOUT",
+        "color": (220, 60, 80),
+        "dark_color": (120, 20, 30),
+        "icon": "🥊",
+        "desc": "Campeão do Ringue",
+        "stats": {"força": 9, "velocidade": 8, "pulo": 6, "defesa": 5},
+        "ability": "Jab Infinito",
+        "special_color": (255, 180, 60),
+        "speed": 7.0,
+        "jump_power": -14.8,
+        "weight": 1.05,
+        "light_dmg": 9, "heavy_dmg": 17, "light_kb": 10, "heavy_kb": 20,
+        "accent": (255, 200, 60),
+        "use_sprite": False,
+        "draw_fn": _draw_boxer,
+    },
+    {
+        "name": "AURELIUS",
+        "color": (220, 180, 30),
+        "dark_color": (80, 60, 0),
+        "icon": "⚜",
+        "desc": "Cavaleiro Dourado",
+        "stats": {"força": 7, "velocidade": 4, "pulo": 5, "defesa": 10},
+        "ability": "Escudo Dourado",
+        "special_color": (255, 230, 80),
+        "speed": 5.5,
+        "jump_power": -13.5,
+        "weight": 1.35,
+        "light_dmg": 7, "heavy_dmg": 19, "light_kb": 7, "heavy_kb": 22,
+        "accent": (255, 240, 100),
+        "use_sprite": False,
+        "draw_fn": _draw_knight,
+    },
+    {
+        "name": "LYRA",
+        "color": (80, 200, 120),
+        "dark_color": (20, 80, 40),
+        "icon": "🏹",
+        "desc": "Arqueira das Florestas",
+        "stats": {"força": 6, "velocidade": 9, "pulo": 8, "defesa": 3},
+        "ability": "Flecha Perfurante",
+        "special_color": (160, 255, 120),
+        "speed": 8.0,
+        "jump_power": -16.0,
+        "weight": 0.78,
+        "light_dmg": 7, "heavy_dmg": 13, "light_kb": 11, "heavy_kb": 17,
+        "accent": (140, 240, 100),
+        "use_sprite": False,
+        "draw_fn": _draw_archer,
+    },
+    {
+        "name": "MORTIS",
+        "color": (100, 60, 160),
+        "dark_color": (30, 10, 60),
+        "icon": "💀",
+        "desc": "Ceifador das Almas",
+        "stats": {"força": 8, "velocidade": 7, "pulo": 7, "defesa": 4},
+        "ability": "Foice Sombria",
+        "special_color": (180, 80, 255),
+        "speed": 7.2,
+        "jump_power": -15.0,
+        "weight": 0.88,
+        "light_dmg": 8, "heavy_dmg": 15, "light_kb": 10, "heavy_kb": 19,
+        "accent": (180, 80, 255),
+        "use_sprite": False,
+        "draw_fn": _draw_reaper,
+    },
+    {
+        "name": "TRITON",
+        "color": (30, 160, 220),
+        "dark_color": (0, 60, 120),
+        "icon": "🔱",
+        "desc": "Senhor dos Mares",
+        "stats": {"força": 7, "velocidade": 7, "pulo": 6, "defesa": 6},
+        "ability": "Maré Tempestuosa",
+        "special_color": (100, 230, 255),
+        "speed": 6.8,
+        "jump_power": -15.2,
+        "weight": 1.0,
+        "light_dmg": 8, "heavy_dmg": 14, "light_kb": 10, "heavy_kb": 18,
+        "accent": (100, 230, 255),
+        "use_sprite": False,
+        "draw_fn": _draw_lancer,
+    },
+    {
+        "name": "BRUTO",
+        "color": (160, 110, 50),
+        "dark_color": (60, 35, 10),
+        "icon": "🐻",
+        "desc": "Ursão Furioso",
+        "stats": {"força": 10, "velocidade": 4, "pulo": 3, "defesa": 7},
+        "ability": "Golpe das Feras",
+        "special_color": (220, 180, 100),
+        "speed": 5.2,
+        "jump_power": -12.5,
+        "weight": 1.6,
+        "light_dmg": 11, "heavy_dmg": 23, "light_kb": 9, "heavy_kb": 28,
+        "accent": (220, 180, 100),
+        "use_sprite": False,
+        "draw_fn": _draw_bear,
     },
 ]
 
@@ -335,6 +937,8 @@ class Player:
         self.heavy_dmg = char_data["heavy_dmg"]
         self.light_kb = char_data["light_kb"]
         self.heavy_kb = char_data["heavy_kb"]
+        self.accent = char_data.get("accent", char_data["special_color"])
+        self.draw_fn = char_data.get("draw_fn", None)
 
         self.use_sprite = char_data.get("use_sprite", False) and bool(SPRITE_CACHE)
         self._walk_timer = 0
@@ -541,6 +1145,8 @@ class Player:
 
         if self.use_sprite:
             self._draw_sprite(surf)
+        elif self.draw_fn is not None:
+            self._draw_custom(surf)
         else:
             self._draw_shape(surf)
 
@@ -552,6 +1158,19 @@ class Player:
             s.fill((*color, 80))
             surf.blit(s, self.attack_hitbox["rect"].topleft)
             pygame.draw.rect(surf, color, self.attack_hitbox["rect"], 2, border_radius=6)
+
+    def _draw_custom(self, surf):
+        """Chama a função de desenho personalizada do personagem."""
+        sx, sy = self.squash_x, self.squash_y
+        w = int(self.W * sx)
+        h = int(self.H * sy)
+        bx = int(self.x + self.W // 2 - w // 2)
+        by = int(self.y + self.H - h)
+        self.draw_fn(surf, bx, by, w, h,
+                     self.color, self.dark_color, self.accent,
+                     self.facing, self.anim_frame,
+                     self.attack_timer, self.attack_type,
+                     self.squash_x, self.squash_y)
 
     def _draw_sprite(self, surf):
         is_moving = abs(self.vx) > 0.8
@@ -704,6 +1323,18 @@ def _draw_char_big_on_pedestal(surf, char, cx, foot_y, tick, facing=1, anim_fram
         surf.blit(scaled, (cx - tgt_w // 2, foot_y - tgt_h + bob))
         return
 
+    # Se tem função de draw personalizada, usa ela (maior)
+    draw_fn = char.get("draw_fn", None)
+    if draw_fn is not None:
+        w_big, h_big = int(W2 * 1.1), int(H2 * 1.1)
+        bx2 = cx - w_big // 2
+        by2 = foot_y - h_big + bob
+        draw_fn(surf, bx2, by2, w_big, h_big,
+                char["color"], char["dark_color"], char.get("accent", char["special_color"]),
+                facing, anim_frame, 0, None, 1.0, 1.0)
+        return
+
+    # Fallback: geometria padrão
     body_rect = pygame.Rect(bx, by, W2, H2)
     pygame.draw.rect(surf, char["dark_color"], body_rect, border_radius=12)
     pygame.draw.rect(surf, char["color"], body_rect.inflate(-8, -8), border_radius=9)
@@ -716,15 +1347,6 @@ def _draw_char_big_on_pedestal(surf, char, cx, foot_y, tick, facing=1, anim_fram
     eoff = 7 if facing == 1 else -7
     pygame.draw.circle(surf, C_WHITE, (hcx + eoff, hcy - 2), 5)
     pygame.draw.circle(surf, C_DARK, (hcx + eoff + facing, hcy - 2), 3)
-    arm_s = int(math.sin(anim_frame * 0.07) * 10)
-    ax = bx + (W2 if facing == 1 else 0)
-    pygame.draw.line(surf, sc, (ax, by + H2 // 3),
-                     (ax + (14 + arm_s) * facing, by + H2 // 3 - 12), 6)
-    ls = int(math.sin(anim_frame * 0.09) * 12)
-    pygame.draw.line(surf, char["dark_color"],
-                     (bx + W2 // 3, by + H2), (bx + W2 // 3 - ls, by + H2 + 16), 6)
-    pygame.draw.line(surf, char["dark_color"],
-                     (bx + 2 * W2 // 3, by + H2), (bx + 2 * W2 // 3 + ls, by + H2 + 16), 6)
 
 
 def _draw_char_thumbnail(surf, char, tx, ty, w, h, idx, tick,
@@ -736,22 +1358,36 @@ def _draw_char_thumbnail(surf, char, tx, ty, w, h, idx, tick,
         rc = tuple(int(c1[i] * (1 - t) + c2[i] * t) for i in range(3))
         pygame.draw.line(surf, rc, (tx, ty + row), (tx + w, ty + row))
 
-    pygame.draw.rect(surf, (0, 0, 0, 0), (tx, ty, w, h))
     inner = pygame.Rect(tx + 4, ty + 4, w - 8, h - 8)
     pygame.draw.rect(surf, (10, 10, 25), inner, border_radius=7)
     pygame.draw.rect(surf, char["dark_color"], inner, 2, border_radius=7)
 
-    icon_font = pygame.font.SysFont("Segoe UI Emoji", 34, bold=True)
-    if not icon_font:
-        icon_font = pygame.font.Font(None, 36)
-
-    icon = char["icon"]
-    icon_s = icon_font.render(icon, True, C_WHITE)
-    icon_shadow = icon_font.render(icon, True, (0, 0, 0))
-    surf.blit(icon_shadow, (tx + w // 2 - icon_s.get_width() // 2 + 1,
-                            ty + h // 2 - icon_s.get_height() // 2 + 2))
-    surf.blit(icon_s, (tx + w // 2 - icon_s.get_width() // 2,
-                       ty + h // 2 - icon_s.get_height() // 2))
+    # Mini-draw do personagem no thumbnail
+    draw_fn = char.get("draw_fn", None)
+    if draw_fn is not None:
+        mini_w, mini_h = 28, 36
+        mini_x = tx + w // 2 - mini_w // 2
+        mini_y = ty + h // 2 - mini_h // 2 + 4
+        # clip para não sair do thumbnail
+        clip_rect = pygame.Rect(tx + 2, ty + 2, w - 4, h - 4)
+        old_clip = surf.get_clip()
+        surf.set_clip(clip_rect)
+        draw_fn(surf, mini_x, mini_y, mini_w, mini_h,
+                char["color"], char["dark_color"],
+                char.get("accent", char["special_color"]),
+                1, tick * 2, 0, None, 1.0, 1.0)
+        surf.set_clip(old_clip)
+    else:
+        icon_font = pygame.font.SysFont("Segoe UI Emoji", 34, bold=True)
+        if not icon_font:
+            icon_font = pygame.font.Font(None, 36)
+        icon = char["icon"]
+        icon_s = icon_font.render(icon, True, C_WHITE)
+        icon_shadow = icon_font.render(icon, True, (0, 0, 0))
+        surf.blit(icon_shadow, (tx + w // 2 - icon_s.get_width() // 2 + 1,
+                                ty + h // 2 - icon_s.get_height() // 2 + 2))
+        surf.blit(icon_s, (tx + w // 2 - icon_s.get_width() // 2,
+                           ty + h // 2 - icon_s.get_height() // 2))
 
     pygame.draw.circle(surf, char["special_color"], (tx + w - 14, ty + 14), 5)
 
@@ -798,7 +1434,7 @@ def _draw_player_info_panel(surf, char, title, p_label, p_col, is_ready,
     title_s = name_font.render(title, True, p_col)
     surf.blit(title_s, (px + 10, py + 8))
 
-    char_name_s = name_font.render(char["name"], True, char["accent"])
+    char_name_s = name_font.render(char["name"], True, char.get("accent", char["special_color"]))
     surf.blit(char_name_s, (px + pw - char_name_s.get_width() - 10, py + 8))
 
     desc_s = stat_font.render(char["desc"], True, (195, 190, 220))
@@ -810,10 +1446,10 @@ def _draw_player_info_panel(surf, char, title, p_label, p_col, is_ready,
     surf.blit(abil_value, (px + 92, py + 48))
 
     stat_data = [
-        ("FOR", char["stats"]["força"], 10, char["accent"]),
-        ("VEL", char["stats"]["velocidade"], 10, char["accent"]),
-        ("PUL", char["stats"]["pulo"], 10, char["accent"]),
-        ("DEF", char["stats"]["defesa"], 10, char["accent"]),
+        ("FOR", char["stats"]["força"], 10, char.get("accent", char["special_color"])),
+        ("VEL", char["stats"]["velocidade"], 10, char.get("accent", char["special_color"])),
+        ("PUL", char["stats"]["pulo"], 10, char.get("accent", char["special_color"])),
+        ("DEF", char["stats"]["defesa"], 10, char.get("accent", char["special_color"])),
     ]
 
     left_x = px + 10
@@ -1196,20 +1832,17 @@ def main():
     if os.path.exists(capa_path):
         capa_img = pygame.transform.smoothscale(
             pygame.image.load(capa_path).convert_alpha(), (WIDTH, HEIGHT))
-        print("[OK] capa.png carregado.")
     else:
         capa_img = pygame.Surface((WIDTH, HEIGHT))
         capa_img.fill(C_DARK)
         fb = pygame.font.SysFont("Arial Black", 72, bold=True)
         t = fb.render("INSPER BRAWL", True, C_YELLOW)
         capa_img.blit(t, (WIDTH//2 - t.get_width()//2, HEIGHT//2 - 60))
-        print(f"[AVISO] capa.png não encontrado em: {capa_path}")
 
     charsel_bg_path = os.path.join(imagens_dir, "selecaopersonagem.png")
     if os.path.exists(charsel_bg_path):
         charsel_bg = pygame.transform.smoothscale(
             pygame.image.load(charsel_bg_path).convert_alpha(), (WIDTH, HEIGHT))
-        print("[OK] selecaopersonagem.png carregado.")
     else:
         charsel_bg = pygame.Surface((WIDTH, HEIGHT))
         for y in range(HEIGHT):
@@ -1218,13 +1851,11 @@ def main():
             g = int(16*(1-t)+30*t)
             b = int(40*(1-t)+70*t)
             pygame.draw.line(charsel_bg, (r, g, b), (0, y), (WIDTH, y))
-        print(f"[AVISO] selecaopersonagem.png não encontrado em: {charsel_bg_path}")
 
     missao_path = os.path.join(imagens_dir, "missao_concluida.png")
     if os.path.exists(missao_path):
         missao_img = pygame.transform.smoothscale(
             pygame.image.load(missao_path).convert_alpha(), (WIDTH, HEIGHT))
-        print("[OK] missao_concluida.png carregado.")
     else:
         missao_img = pygame.Surface((WIDTH, HEIGHT))
         for y in range(HEIGHT):
@@ -1238,7 +1869,6 @@ def main():
             fb2 = pygame.font.Font(None, 86)
         t2 = fb2.render("MISSÃO CONCLUÍDA!", True, C_YELLOW)
         missao_img.blit(t2, (WIDTH//2 - t2.get_width()//2, HEIGHT//2 - 160))
-        print(f"[AVISO] missao_concluida.png não encontrado em: {missao_path}")
 
     jogar_btn_rect = get_jogar_button_rect()
 
