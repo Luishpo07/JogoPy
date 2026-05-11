@@ -683,9 +683,9 @@ def draw_platforms(surf, platforms, landscape_name):
 # ══════════════════════════════════════════════════════════════════════════════
 
 # CORRIGIDO: removido conflito de merge Git — mantida a versão correta (HEAD)
-PED_LEFT_CX  = 455
-PED_RIGHT_CX = 780
-PED_TOP_Y    = 588
+PED_LEFT_CX  = 491
+PED_RIGHT_CX = 782
+PED_TOP_Y    = 535
 
 THUMB_W, THUMB_H = 68, 68
 THUMB_GAP = 5
