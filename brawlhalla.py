@@ -40,19 +40,16 @@ C_P2_DARK = (180, 30, 30)
 SPRITE_CACHE = {}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  LOCALIZAÇÃO ROBUSTA DA PASTA "imagens"
-# ══════════════════════════════════════════════════════════════════════════════
 def find_imagens_dir(script_path):
     d = os.path.dirname(os.path.abspath(script_path))
     parent = os.path.dirname(d)
     grandparent = os.path.dirname(parent)
 
     candidates = [
-        os.path.join(d,           "imagens"),
-        os.path.join(d,           "Anexos", "imagens"),
-        os.path.join(parent,      "imagens"),
-        os.path.join(parent,      "Anexos", "imagens"),
+        os.path.join(d, "imagens"),
+        os.path.join(d, "Anexos", "imagens"),
+        os.path.join(parent, "imagens"),
+        os.path.join(parent, "Anexos", "imagens"),
         os.path.join(grandparent, "imagens"),
         os.path.join(grandparent, "Anexos", "imagens"),
     ]
@@ -71,7 +68,6 @@ def find_imagens_dir(script_path):
 
 
 def load_sprites(imagens_dir):
-    # CORRIGIDO: usa imagens_dir em vez de base_dir
     folder = os.path.join(imagens_dir, "Personagem1")
 
     if not os.path.isdir(folder):
@@ -570,11 +566,6 @@ class Player:
             scaled = flip_sprite(scaled)
         draw_x = int(self.x + self.W / 2 - sq_w / 2)
         draw_y = int(self.y + self.H - sq_h)
-        if self.attack_timer > 5:
-            glow = pygame.Surface((sq_w, sq_h), pygame.SRCALPHA)
-            sc = self.special_color
-            glow.fill((*sc, 70))
-            surf.blit(glow, (draw_x, draw_y))
         surf.blit(scaled, (draw_x, draw_y))
 
     def _draw_shape(self, surf):
@@ -638,9 +629,12 @@ def draw_hud(surf, p1, p2, font_big, font_small):
         pygame.draw.circle(surf, C_WHITE, (WIDTH - 120 - i * 28, HEIGHT - 30), 10, 2)
 
     def dmg_color(d):
-        if d < 50: return C_WHITE
-        if d < 100: return C_YELLOW
-        if d < 150: return C_ORANGE
+        if d < 50:
+            return C_WHITE
+        if d < 100:
+            return C_YELLOW
+        if d < 150:
+            return C_ORANGE
         return C_RED
 
     t1 = font_big.render(f"{p1.damage}%", True, dmg_color(p1.damage))
@@ -678,11 +672,6 @@ def draw_platforms(surf, platforms, landscape_name):
         pygame.draw.rect(surf, c_edge, (px, py, pw, ph + 8), 2, border_radius=8)
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  TELA DE SELEÇÃO DE PERSONAGEM
-# ══════════════════════════════════════════════════════════════════════════════
-
-# CORRIGIDO: removido conflito de merge Git — mantida a versão correta (HEAD)
 PED_LEFT_CX  = 491
 PED_RIGHT_CX = 782
 PED_TOP_Y    = 535
@@ -704,13 +693,6 @@ def _draw_char_big_on_pedestal(surf, char, cx, foot_y, tick, facing=1, anim_fram
     bx = cx - W2 // 2
     by = foot_y - H2 + bob
 
-    if player_col:
-        glow_alpha = 90 + int(math.sin(tick * 0.08) * 30)
-        glow_w, glow_h = 110, 28
-        glow_surf = pygame.Surface((glow_w, glow_h), pygame.SRCALPHA)
-        pygame.draw.ellipse(glow_surf, (*player_col, glow_alpha), (0, 0, glow_w, glow_h))
-        surf.blit(glow_surf, (cx - glow_w // 2, foot_y - 10))
-
     if char.get("use_sprite") and SPRITE_CACHE:
         idle = SPRITE_CACHE["p1_idle"]
         orig_w, orig_h = idle.get_size()
@@ -719,11 +701,6 @@ def _draw_char_big_on_pedestal(surf, char, cx, foot_y, tick, facing=1, anim_fram
         scaled = scale_sprite(idle, tgt_w, tgt_h)
         if facing == -1:
             scaled = flip_sprite(scaled)
-        if is_ready and player_col:
-            glow2 = pygame.Surface((tgt_w + 30, tgt_h + 30), pygame.SRCALPHA)
-            a2 = 50 + int(math.sin(tick * 0.1) * 25)
-            pygame.draw.ellipse(glow2, (*player_col, a2), (0, 0, tgt_w + 30, tgt_h + 30))
-            surf.blit(glow2, (cx - tgt_w // 2 - 15, foot_y - tgt_h - 15 + bob))
         surf.blit(scaled, (cx - tgt_w // 2, foot_y - tgt_h + bob))
         return
 
@@ -751,7 +728,7 @@ def _draw_char_big_on_pedestal(surf, char, cx, foot_y, tick, facing=1, anim_fram
 
 
 def _draw_char_thumbnail(surf, char, tx, ty, w, h, idx, tick,
-                          sel_p1=False, sel_p2=False):
+                         sel_p1=False, sel_p2=False):
     c1 = char["color"]
     c2 = char["dark_color"]
     for row in range(h):
@@ -759,15 +736,24 @@ def _draw_char_thumbnail(surf, char, tx, ty, w, h, idx, tick,
         rc = tuple(int(c1[i] * (1 - t) + c2[i] * t) for i in range(3))
         pygame.draw.line(surf, rc, (tx, ty + row), (tx + w, ty + row))
 
-    bw, bh = max(10, w // 3 + 2), max(14, h // 2 + 2)
-    bx2 = tx + w // 2 - bw // 2
-    by2 = ty + h // 2 - bh // 2 + 4
-    pygame.draw.rect(surf, char["dark_color"], (bx2, by2, bw, bh), border_radius=5)
-    pygame.draw.rect(surf, char["color"], (bx2 + 2, by2 + 2, bw - 4, bh - 4), border_radius=4)
-    hr = max(5, bw // 2)
-    pygame.draw.circle(surf, char["dark_color"], (tx + w // 2, by2 - hr + 2), hr + 1)
-    pygame.draw.circle(surf, char["color"], (tx + w // 2, by2 - hr + 2), hr - 1)
-    pygame.draw.circle(surf, C_WHITE, (tx + w // 2 + 3, by2 - hr + 1), 2)
+    pygame.draw.rect(surf, (0, 0, 0, 0), (tx, ty, w, h))
+    inner = pygame.Rect(tx + 4, ty + 4, w - 8, h - 8)
+    pygame.draw.rect(surf, (10, 10, 25), inner, border_radius=7)
+    pygame.draw.rect(surf, char["dark_color"], inner, 2, border_radius=7)
+
+    icon_font = pygame.font.SysFont("Segoe UI Emoji", 34, bold=True)
+    if not icon_font:
+        icon_font = pygame.font.Font(None, 36)
+
+    icon = char["icon"]
+    icon_s = icon_font.render(icon, True, C_WHITE)
+    icon_shadow = icon_font.render(icon, True, (0, 0, 0))
+    surf.blit(icon_shadow, (tx + w // 2 - icon_s.get_width() // 2 + 1,
+                            ty + h // 2 - icon_s.get_height() // 2 + 2))
+    surf.blit(icon_s, (tx + w // 2 - icon_s.get_width() // 2,
+                       ty + h // 2 - icon_s.get_height() // 2))
+
+    pygame.draw.circle(surf, char["special_color"], (tx + w - 14, ty + 14), 5)
 
     r = pygame.Rect(tx, ty, w, h)
     if sel_p1 and sel_p2:
@@ -794,12 +780,162 @@ def _draw_stat_bar(surf, x, y, label, val, max_val, color, font):
         pygame.draw.rect(surf, color, (bx, y + 3, fw, 7), border_radius=4)
 
 
+def _draw_player_info_panel(surf, char, title, p_label, p_col, is_ready,
+                            ctrl_str, confirm_str,
+                            px, py, pw, ph,
+                            name_font, stat_font, info_font, tick):
+    bg = pygame.Surface((pw, ph), pygame.SRCALPHA)
+    bg.fill((7, 12, 28, 230))
+    surf.blit(bg, (px, py))
+
+    pygame.draw.rect(surf, (0, 0, 0), (px, py, pw, ph), 1, border_radius=8)
+    pygame.draw.rect(surf, p_col, (px, py, pw, ph), 2, border_radius=8)
+
+    top_band = pygame.Surface((pw - 6, 18), pygame.SRCALPHA)
+    top_band.fill((*p_col, 35))
+    surf.blit(top_band, (px + 3, py + 3))
+
+    title_s = name_font.render(title, True, p_col)
+    surf.blit(title_s, (px + 10, py + 8))
+
+    char_name_s = name_font.render(char["name"], True, char["accent"])
+    surf.blit(char_name_s, (px + pw - char_name_s.get_width() - 10, py + 8))
+
+    desc_s = stat_font.render(char["desc"], True, (195, 190, 220))
+    surf.blit(desc_s, (px + 10, py + 30))
+
+    abil_label = stat_font.render("Habilidade:", True, (170, 170, 210))
+    abil_value = stat_font.render(char["ability"], True, char["special_color"])
+    surf.blit(abil_label, (px + 10, py + 48))
+    surf.blit(abil_value, (px + 92, py + 48))
+
+    stat_data = [
+        ("FOR", char["stats"]["força"], 10, char["accent"]),
+        ("VEL", char["stats"]["velocidade"], 10, char["accent"]),
+        ("PUL", char["stats"]["pulo"], 10, char["accent"]),
+        ("DEF", char["stats"]["defesa"], 10, char["accent"]),
+    ]
+
+    left_x = px + 10
+    right_x = px + pw // 2 + 10
+    top_stats_y = py + 68
+
+    for i, (label, val, mx, col) in enumerate(stat_data):
+        cx2 = left_x if i < 2 else right_x
+        cy2 = top_stats_y + (i % 2) * 16
+        _draw_stat_bar(surf, cx2, cy2, label, val, mx, col, stat_font)
+
+    bottom_bar_y = py + ph - 22
+    pygame.draw.rect(surf, (18, 18, 34), (px + 8, bottom_bar_y, pw - 16, 14), border_radius=7)
+    pygame.draw.rect(surf, p_col, (px + 8, bottom_bar_y, pw - 16, 14), 1, border_radius=7)
+
+    ctrl_s = stat_font.render(ctrl_str, True, (185, 185, 215))
+    surf.blit(ctrl_s, (px + 10, py + ph - 40))
+
+    if is_ready:
+        rp = 0.5 + 0.5 * abs(math.sin(tick * 0.12))
+        rc = tuple(int(c * rp) for c in (80, 255, 100))
+        rd = info_font.render(f"✔  {p_label} PRONTO!", True, rc)
+        surf.blit(rd, (px + pw - rd.get_width() - 12, py + ph - 42))
+    else:
+        conf_s = info_font.render(confirm_str, True, C_YELLOW)
+        surf.blit(conf_s, (px + pw - conf_s.get_width() - 12, py + ph - 42))
+
+
+def get_jogar_button_rect():
+    return pygame.Rect(142, 367, 392, 136)
+
+
+def draw_intro(surf, font_small, capa_img, tick, jogar_btn_rect):
+    surf.blit(capa_img, (0, 0))
+    mouse_pos = pygame.mouse.get_pos()
+    hovering = jogar_btn_rect.collidepoint(mouse_pos)
+    pulse = 0.4 + 0.35 * math.sin(tick * 0.08)
+    alpha = int(pulse * 80) if not hovering else 140
+    glow_surf = pygame.Surface((jogar_btn_rect.w + 20, jogar_btn_rect.h + 20), pygame.SRCALPHA)
+    pygame.draw.rect(glow_surf, (255, 220, 50, alpha),
+                     (0, 0, jogar_btn_rect.w + 20, jogar_btn_rect.h + 20), border_radius=30)
+    surf.blit(glow_surf, (jogar_btn_rect.x - 10, jogar_btn_rect.y - 10))
+    if hovering:
+        pygame.draw.rect(surf, C_WHITE, jogar_btn_rect.inflate(6, 6), 3, border_radius=28)
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+    else:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+    hint = font_small.render("Clique em JOGAR ou pressione ENTER", True, (220, 220, 220))
+    shadow = font_small.render("Clique em JOGAR ou pressione ENTER", True, (0, 0, 0))
+    surf.blit(shadow, (WIDTH // 2 - hint.get_width() // 2 + 1, HEIGHT - 28))
+    surf.blit(hint,   (WIDTH // 2 - hint.get_width() // 2,     HEIGHT - 29))
+
+
+def draw_instructions(surf, font_title, font_small, font_big, tick):
+    for y in range(HEIGHT):
+        t = y / HEIGHT
+        pygame.draw.line(surf,
+                         (int(8*(1-t)+20*t), int(5*(1-t)+12*t), int(25*(1-t)+55*t)),
+                         (0, y), (WIDTH, y))
+
+    title = font_title.render("COMO JOGAR", True, C_YELLOW)
+    surf.blit(title, (WIDTH // 2 - title.get_width() // 2, 40))
+    pygame.draw.line(surf, C_YELLOW, (WIDTH//2-300, 110), (WIDTH//2+300, 110), 2)
+
+    panels = [
+        {"title": "JOGADOR 1", "color": C_P1, "x": 80,
+         "controls": [("Mover", "A  /  D"), ("Pular", "W  (2x = double jump)"),
+                      ("Ataque Leve", "F"), ("Ataque Forte", "G"), ("Dodge / Air Dash", "S")]},
+        {"title": "JOGADOR 2", "color": C_P2, "x": WIDTH//2+80,
+         "controls": [("Mover", "← / →"), ("Pular", "↑  (2x = double jump)"),
+                      ("Ataque Leve", "L"), ("Ataque Forte", "K"), ("Dodge / Air Dash", "↓")]},
+    ]
+    panel_w, panel_h = 510, 340
+    for panel in panels:
+        px, py = panel["x"], 140
+        col = panel["color"]
+        bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        bg.fill((*col, 25))
+        surf.blit(bg, (px, py))
+        pygame.draw.rect(surf, col, (px, py, panel_w, panel_h), 2, border_radius=12)
+        t = font_big.render(panel["title"], True, col)
+        surf.blit(t, (px + panel_w//2 - t.get_width()//2, py + 14))
+        pygame.draw.line(surf, col, (px+20, py+58), (px+panel_w-20, py+58), 1)
+        for idx, (action, key) in enumerate(panel["controls"]):
+            row_y = py + 75 + idx * 50
+            act_s = font_small.render(action, True, (200, 200, 230))
+            surf.blit(act_s, (px+24, row_y))
+            key_s = font_small.render(key, True, C_YELLOW)
+            key_bg = pygame.Surface((key_s.get_width()+16, key_s.get_height()+6), pygame.SRCALPHA)
+            key_bg.fill((255, 220, 50, 40))
+            surf.blit(key_bg, (px+panel_w-key_s.get_width()-28, row_y-2))
+            surf.blit(key_s,  (px+panel_w-key_s.get_width()-20, row_y))
+
+    tips = ["• Empurre o adversário para fora da arena para marcar pontos",
+            "• Cada jogador começa com 3 vidas — quem ficar sem primeiro perde",
+            "• Quanto maior o % de dano, mais longe você voa ao ser atingido"]
+    for i, tip in enumerate(tips):
+        tip_s = font_small.render(tip, True, (180, 175, 220))
+        surf.blit(tip_s, (WIDTH//2 - tip_s.get_width()//2, 510 + i*30))
+
+    btn_w, btn_h = 340, 54
+    btn_x, btn_y = WIDTH//2 - btn_w//2, HEIGHT - 80
+    pulse = 0.75 + 0.25 * math.sin(tick * 0.09)
+    btn_col = tuple(int(c * pulse) for c in C_YELLOW)
+    pygame.draw.rect(surf, (30, 25, 60), (btn_x, btn_y, btn_w, btn_h), border_radius=28)
+    pygame.draw.rect(surf, btn_col, (btn_x, btn_y, btn_w, btn_h), 3, border_radius=28)
+    btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+    if btn_rect.collidepoint(pygame.mouse.get_pos()):
+        fill = pygame.Surface((btn_w, btn_h), pygame.SRCALPHA)
+        fill.fill((255, 220, 50, 30))
+        surf.blit(fill, (btn_x, btn_y))
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+    else:
+        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+    btn_text = font_small.render("▶  ESCOLHER PERSONAGEM", True, C_YELLOW)
+    surf.blit(btn_text, (btn_x + btn_w//2 - btn_text.get_width()//2,
+                          btn_y + btn_h//2 - btn_text.get_height()//2))
+    return btn_rect
+
+
 def draw_character_select(surf, font_title, font_small, font_big, css, tick, charsel_bg):
     surf.blit(charsel_bg, (0, 0))
-
-    top_overlay = pygame.Surface((WIDTH, 310), pygame.SRCALPHA)
-    top_overlay.fill((0, 0, 0, 155))
-    surf.blit(top_overlay, (0, 0))
 
     try:
         title_font = pygame.font.SysFont("Arial Black", 20, bold=True)
@@ -809,10 +945,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick, cha
         stat_font  = pygame.font.SysFont("Arial", 12)
     except Exception:
         title_font = ctrl_font = name_font = info_font = stat_font = pygame.font.Font(None, 16)
-
-    bar_h = 36
-    pygame.draw.rect(surf, (5, 10, 28, 220), (0, 0, WIDTH, bar_h))
-    pygame.draw.line(surf, (50, 90, 180), (0, bar_h), (WIDTH, bar_h), 1)
 
     title_s = title_font.render("SELECIONE SEU PERSONAGEM", True, C_YELLOW)
     surf.blit(title_s, (WIDTH // 2 - title_s.get_width() // 2, 8))
@@ -827,12 +959,12 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick, cha
     cols = GRID_COLS
     rows = math.ceil(n / cols)
     cell_w = THUMB_W + THUMB_GAP
-    cell_h = THUMB_H + THUMB_GAP + 16
+    cell_h = THUMB_H + THUMB_GAP + 8
     total_gw = cols * cell_w - THUMB_GAP
     total_gh = rows * cell_h - THUMB_GAP
 
     gsx = WIDTH // 2 - total_gw // 2
-    gsy = bar_h + 6
+    gsy = 40
 
     pad = 7
     grid_bg = pygame.Surface((total_gw + pad * 2, total_gh + pad * 2), pygame.SRCALPHA)
@@ -858,10 +990,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick, cha
 
         _draw_char_thumbnail(surf, char, tx, ty, THUMB_W, THUMB_H, idx, tick,
                              sel_p1=sel_p1, sel_p2=sel_p2)
-
-        nm_col = char["accent"] if (sel_p1 or sel_p2) else (130, 125, 170)
-        nm = ctrl_font.render(char["name"], True, nm_col)
-        surf.blit(nm, (tx + THUMB_W // 2 - nm.get_width() // 2, ty + THUMB_H + 2))
 
     for pidx, pcol, plabel in [(css["p1_idx"], C_P1, "P1"), (css["p2_idx"], C_P2, "P2")]:
         col_i = pidx % cols
@@ -930,147 +1058,6 @@ def draw_character_select(surf, font_title, font_small, font_big, css, tick, cha
     return back_rect
 
 
-def _draw_player_info_panel(surf, char, title, p_label, p_col, is_ready,
-                              ctrl_str, confirm_str,
-                              px, py, pw, ph,
-                              name_font, stat_font, info_font, tick):
-    bg = pygame.Surface((pw, ph), pygame.SRCALPHA)
-    bg.fill((5, 10, 30, 200))
-    surf.blit(bg, (px, py))
-    pulse = 0.65 + 0.35 * math.sin(tick * 0.08)
-    bdr = tuple(int(c * pulse) for c in p_col)
-    pygame.draw.rect(surf, bdr, (px, py, pw, ph), 2, border_radius=6)
-    pygame.draw.line(surf, p_col, (px + 4, py + 2), (px + pw - 4, py + 2), 1)
-    row_y = py + 8
-    title_s = name_font.render(title, True, p_col)
-    surf.blit(title_s, (px + 8, row_y))
-    char_name_s = name_font.render(char["name"], True, char["accent"])
-    surf.blit(char_name_s, (px + pw - char_name_s.get_width() - 8, row_y))
-    row_y += 20
-    desc_s = stat_font.render(char["desc"], True, (175, 165, 210))
-    surf.blit(desc_s, (px + 8, row_y))
-    abil_s = stat_font.render(f"Habilidade: {char['ability']}", True, char["special_color"])
-    surf.blit(abil_s, (px + pw // 2 + 4, row_y))
-    row_y += 18
-    stat_data = [
-        ("FOR", char["stats"]["força"],     10, char["accent"]),
-        ("VEL", char["stats"]["velocidade"],10, char["accent"]),
-        ("PUL", char["stats"]["pulo"],      10, char["accent"]),
-        ("DEF", char["stats"]["defesa"],    10, char["accent"]),
-    ]
-    col_w = pw // 2 - 8
-    for si, (label, val, mx, col) in enumerate(stat_data):
-        cx2 = px + 8 + (si % 2) * (col_w + 8)
-        cy2 = row_y + (si // 2) * 16
-        _draw_stat_bar(surf, cx2, cy2, label, val, mx, col, stat_font)
-    row_y += 38
-    ctrl_s = stat_font.render(ctrl_str, True, (175, 175, 215))
-    surf.blit(ctrl_s, (px + 8, row_y))
-    row_y += 14
-    if is_ready:
-        rp = 0.5 + 0.5 * abs(math.sin(tick * 0.12))
-        rc = tuple(int(c * rp) for c in (80, 255, 100))
-        rd = info_font.render(f"✔  {p_label} PRONTO!", True, rc)
-        surf.blit(rd, (px + 8, row_y))
-    else:
-        conf_s = stat_font.render(confirm_str, True, C_YELLOW)
-        surf.blit(conf_s, (px + 8, row_y))
-
-
-# ─── TELA INICIAL COM capa.png ────────────────────────────────────────────────
-def get_jogar_button_rect():
-    return pygame.Rect(142, 367, 392, 136)
-
-
-def draw_intro(surf, font_small, capa_img, tick, jogar_btn_rect):
-    surf.blit(capa_img, (0, 0))
-    mouse_pos = pygame.mouse.get_pos()
-    hovering = jogar_btn_rect.collidepoint(mouse_pos)
-    pulse = 0.4 + 0.35 * math.sin(tick * 0.08)
-    alpha = int(pulse * 80) if not hovering else 140
-    glow_surf = pygame.Surface((jogar_btn_rect.w + 20, jogar_btn_rect.h + 20), pygame.SRCALPHA)
-    pygame.draw.rect(glow_surf, (255, 220, 50, alpha),
-                     (0, 0, jogar_btn_rect.w + 20, jogar_btn_rect.h + 20), border_radius=30)
-    surf.blit(glow_surf, (jogar_btn_rect.x - 10, jogar_btn_rect.y - 10))
-    if hovering:
-        pygame.draw.rect(surf, C_WHITE, jogar_btn_rect.inflate(6, 6), 3, border_radius=28)
-        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
-    else:
-        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-    hint = font_small.render("Clique em JOGAR ou pressione ENTER", True, (220, 220, 220))
-    shadow = font_small.render("Clique em JOGAR ou pressione ENTER", True, (0, 0, 0))
-    surf.blit(shadow, (WIDTH // 2 - hint.get_width() // 2 + 1, HEIGHT - 28))
-    surf.blit(hint,   (WIDTH // 2 - hint.get_width() // 2,     HEIGHT - 29))
-
-
-# ─── TELA DE INSTRUÇÕES ───────────────────────────────────────────────────────
-def draw_instructions(surf, font_title, font_small, font_big, tick):
-    for y in range(HEIGHT):
-        t = y / HEIGHT
-        pygame.draw.line(surf,
-                         (int(8*(1-t)+20*t), int(5*(1-t)+12*t), int(25*(1-t)+55*t)),
-                         (0, y), (WIDTH, y))
-
-    title = font_title.render("COMO JOGAR", True, C_YELLOW)
-    surf.blit(title, (WIDTH // 2 - title.get_width() // 2, 40))
-    pygame.draw.line(surf, C_YELLOW, (WIDTH//2-300, 110), (WIDTH//2+300, 110), 2)
-
-    panels = [
-        {"title": "JOGADOR 1", "color": C_P1, "x": 80,
-         "controls": [("Mover","A  /  D"),("Pular","W  (2x = double jump)"),
-                      ("Ataque Leve","F"),("Ataque Forte","G"),("Dodge / Air Dash","S")]},
-        {"title": "JOGADOR 2", "color": C_P2, "x": WIDTH//2+80,
-         "controls": [("Mover","← / →"),("Pular","↑  (2x = double jump)"),
-                      ("Ataque Leve","L"),("Ataque Forte","K"),("Dodge / Air Dash","↓")]},
-    ]
-    panel_w, panel_h = 510, 340
-    for panel in panels:
-        px, py = panel["x"], 140
-        col = panel["color"]
-        bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        bg.fill((*col, 25))
-        surf.blit(bg, (px, py))
-        pygame.draw.rect(surf, col, (px, py, panel_w, panel_h), 2, border_radius=12)
-        t = font_big.render(panel["title"], True, col)
-        surf.blit(t, (px + panel_w//2 - t.get_width()//2, py + 14))
-        pygame.draw.line(surf, col, (px+20, py+58), (px+panel_w-20, py+58), 1)
-        for idx, (action, key) in enumerate(panel["controls"]):
-            row_y = py + 75 + idx * 50
-            act_s = font_small.render(action, True, (200, 200, 230))
-            surf.blit(act_s, (px+24, row_y))
-            key_s = font_small.render(key, True, C_YELLOW)
-            key_bg = pygame.Surface((key_s.get_width()+16, key_s.get_height()+6), pygame.SRCALPHA)
-            key_bg.fill((255, 220, 50, 40))
-            surf.blit(key_bg, (px+panel_w-key_s.get_width()-28, row_y-2))
-            surf.blit(key_s,  (px+panel_w-key_s.get_width()-20, row_y))
-
-    tips = ["• Empurre o adversário para fora da arena para marcar pontos",
-            "• Cada jogador começa com 3 vidas — quem ficar sem primeiro perde",
-            "• Quanto maior o % de dano, mais longe você voa ao ser atingido"]
-    for i, tip in enumerate(tips):
-        tip_s = font_small.render(tip, True, (180, 175, 220))
-        surf.blit(tip_s, (WIDTH//2 - tip_s.get_width()//2, 510 + i*30))
-
-    btn_w, btn_h = 340, 54
-    btn_x, btn_y = WIDTH//2 - btn_w//2, HEIGHT - 80
-    pulse = 0.75 + 0.25 * math.sin(tick * 0.09)
-    btn_col = tuple(int(c * pulse) for c in C_YELLOW)
-    pygame.draw.rect(surf, (30, 25, 60), (btn_x, btn_y, btn_w, btn_h), border_radius=28)
-    pygame.draw.rect(surf, btn_col, (btn_x, btn_y, btn_w, btn_h), 3, border_radius=28)
-    btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
-    if btn_rect.collidepoint(pygame.mouse.get_pos()):
-        fill = pygame.Surface((btn_w, btn_h), pygame.SRCALPHA)
-        fill.fill((255, 220, 50, 30))
-        surf.blit(fill, (btn_x, btn_y))
-        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
-    else:
-        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-    btn_text = font_small.render("▶  ESCOLHER PERSONAGEM", True, C_YELLOW)
-    surf.blit(btn_text, (btn_x + btn_w//2 - btn_text.get_width()//2,
-                          btn_y + btn_h//2 - btn_text.get_height()//2))
-    return btn_rect
-
-
 def draw_landscape_select(surf, font_title, font_small, font_big,
                            selected_idx, tick, bg_images, bg_cards):
     surf.blit(bg_images[LANDSCAPE_NAMES[selected_idx]], (0, 0))
@@ -1108,7 +1095,6 @@ def draw_landscape_select(surf, font_title, font_small, font_big,
     surf.blit(instr, (WIDTH//2 - instr.get_width()//2, HEIGHT-50))
 
 
-# ─── TELA DE VITÓRIA: MISSÃO CONCLUÍDA ───────────────────────────────────────
 def draw_missao_concluida(surf, font_small, missao_img, winner, tick, win_particles):
     surf.blit(missao_img, (0, 0))
 
@@ -1126,7 +1112,7 @@ def draw_missao_concluida(surf, font_small, missao_img, winner, tick, win_partic
     shadow_text = wfont.render(f"🏆  {winner} VENCEU!", True, (0, 0, 0))
     wx = WIDTH // 2 - winner_text.get_width() // 2
     surf.blit(shadow_text, (wx + 2, 432))
-    surf.blit(winner_text, (wx,     430))
+    surf.blit(winner_text, (wx, 430))
 
     btn_w, btn_h = 260, 62
     gap = 40
@@ -1187,7 +1173,6 @@ def main():
         font_big   = pygame.font.Font(None, 52)
         font_small = pygame.font.Font(None, 28)
 
-    # CORRIGIDO: passa __file__ para find_imagens_dir e usa imagens_dir em load_sprites
     imagens_dir = find_imagens_dir(__file__)
 
     sprites_ok = load_sprites(imagens_dir)
@@ -1207,7 +1192,6 @@ def main():
         img = pygame.image.load(path).convert_alpha()
         return pygame.transform.smoothscale(img, (WIDTH, HEIGHT))
 
-    # Capa
     capa_path = os.path.join(imagens_dir, "capa.png")
     if os.path.exists(capa_path):
         capa_img = pygame.transform.smoothscale(
@@ -1221,7 +1205,6 @@ def main():
         capa_img.blit(t, (WIDTH//2 - t.get_width()//2, HEIGHT//2 - 60))
         print(f"[AVISO] capa.png não encontrado em: {capa_path}")
 
-    # Background da tela de seleção de personagem
     charsel_bg_path = os.path.join(imagens_dir, "selecaopersonagem.png")
     if os.path.exists(charsel_bg_path):
         charsel_bg = pygame.transform.smoothscale(
@@ -1237,7 +1220,6 @@ def main():
             pygame.draw.line(charsel_bg, (r, g, b), (0, y), (WIDTH, y))
         print(f"[AVISO] selecaopersonagem.png não encontrado em: {charsel_bg_path}")
 
-    # Missão concluída
     missao_path = os.path.join(imagens_dir, "missao_concluida.png")
     if os.path.exists(missao_path):
         missao_img = pygame.transform.smoothscale(
@@ -1465,7 +1447,6 @@ def main():
                 pg.update()
             global_particles = [pg for pg in global_particles if pg.life > 0]
 
-        # ── Renderização ──────────────────────────────────────────────────
         if state == "intro":
             draw_intro(surf, font_small, capa_img, tick, jogar_btn_rect)
 
