@@ -868,50 +868,33 @@ def draw_intro(surf, font_small, capa_img, tick, jogar_btn_rect):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# NOVA TELA DE INSTRUÇÕES — Visual imersivo estilo arena de combate
+# TELA DE INSTRUÇÕES
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _draw_key_badge(surf, x, y, label, font, color=(255, 220, 50), w_min=44, h=32):
-    """Desenha uma tecla estilo mecânica com sombra, gradiente e brilho."""
     lbl_surf = font.render(label, True, color)
     w = max(w_min, lbl_surf.get_width() + 18)
-
-    # sombra
     shadow = pygame.Surface((w, h), pygame.SRCALPHA)
     pygame.draw.rect(shadow, (0, 0, 0, 120), (0, 0, w, h), border_radius=7)
     surf.blit(shadow, (x + 2, y + 4))
-
-    # corpo escuro
     pygame.draw.rect(surf, (15, 12, 35), (x, y, w, h), border_radius=7)
-
-    # faixa de cor superior (brilho)
     top_hl = pygame.Surface((w - 6, 8), pygame.SRCALPHA)
     top_hl.fill((*color, 55))
     surf.blit(top_hl, (x + 3, y + 3))
-
-    # borda colorida
     pygame.draw.rect(surf, color, (x, y, w, h), 2, border_radius=7)
-
-    # texto centrado
     surf.blit(lbl_surf, (x + w // 2 - lbl_surf.get_width() // 2,
                          y + h // 2 - lbl_surf.get_height() // 2))
-    return w  # retorna largura para encadeamento
+    return w
 
 
 def _draw_action_row(surf, ax, ay, action_label, keys_info, action_font, key_font,
                      p_color, accent_color, tick, row_idx):
-    """Linha de ação: ícone + nome da ação + teclas."""
-    # fundo da linha com leve alternância
     if row_idx % 2 == 0:
         bg_row = pygame.Surface((480, 36), pygame.SRCALPHA)
         bg_row.fill((*p_color, 12))
         surf.blit(bg_row, (ax - 8, ay - 4))
-
-    # nome da ação
     act_s = action_font.render(action_label, True, (220, 215, 245))
     surf.blit(act_s, (ax, ay + 4))
-
-    # teclas
     kx = ax + 170
     for key_label in keys_info:
         kw = _draw_key_badge(surf, kx, ay, key_label, key_font,
@@ -920,7 +903,7 @@ def _draw_action_row(surf, ax, ay, action_label, keys_info, action_font, key_fon
 
 
 def draw_instructions(surf, font_title, font_small, font_big, tick):
-    # ── Fundo: gradiente escuro com vinheta e estrelas animadas ──────────────
+    # ── Fundo ────────────────────────────────────────────────────────────────
     for y in range(HEIGHT):
         t = y / HEIGHT
         r = int(6 * (1 - t) + 18 * t)
@@ -928,7 +911,6 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
         b = int(22 * (1 - t) + 48 * t)
         pygame.draw.line(surf, (r, g, b), (0, y), (WIDTH, y))
 
-    # estrelas de fundo (seed fixa para posições consistentes)
     rng = random.Random(42)
     for _ in range(80):
         sx = rng.randint(0, WIDTH)
@@ -937,7 +919,6 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
         twinkle = int(brightness * (0.6 + 0.4 * math.sin(tick * 0.05 + rng.random() * 6.28)))
         pygame.draw.circle(surf, (twinkle, twinkle, twinkle + 30), (sx, sy), rng.randint(1, 2))
 
-    # ── Linhas decorativas diagonais nos cantos ───────────────────────────────
     diag_alpha = int(30 + 20 * math.sin(tick * 0.04))
     diag_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     for i in range(6):
@@ -948,17 +929,15 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
                          (WIDTH, 100 + off), (WIDTH - 180, off), 1)
     surf.blit(diag_surf, (0, 0))
 
-    # ── Título ────────────────────────────────────────────────────────────────
+    # ── Fontes ────────────────────────────────────────────────────────────────
     try:
         title_font = pygame.font.SysFont("Arial Black", 48, bold=True)
-        sub_font   = pygame.font.SysFont("Arial", 17)
         act_font   = pygame.font.SysFont("Arial", 17, bold=True)
         key_font   = pygame.font.SysFont("Arial Black", 13, bold=True)
-        tip_font   = pygame.font.SysFont("Arial", 15)
     except Exception:
-        title_font = sub_font = act_font = key_font = tip_font = pygame.font.Font(None, 22)
+        title_font = act_font = key_font = pygame.font.Font(None, 22)
 
-    # barra decorativa acima do título
+    # ── Título ────────────────────────────────────────────────────────────────
     bar_pulse = int(180 + 60 * math.sin(tick * 0.06))
     for bx_off, bw_sz, bcol in [
         (WIDTH // 2 - 260, 520, (bar_pulse, bar_pulse // 2, 255)),
@@ -972,13 +951,13 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
     surf.blit(title_sh, (tx + 3, 38))
     surf.blit(title_s,  (tx,     36))
 
-    # linha ornamental sob o título
     pygame.draw.line(surf, (120, 90, 200), (WIDTH // 2 - 320, 100), (WIDTH // 2 + 320, 100), 1)
     pygame.draw.line(surf, C_YELLOW,       (WIDTH // 2 - 160, 104), (WIDTH // 2 + 160, 104), 2)
     pygame.draw.circle(surf, C_YELLOW, (WIDTH // 2, 104), 5)
 
-    # ── Painéis dos jogadores ─────────────────────────────────────────────────
-    PANEL_W, PANEL_H = 555, 360
+    # ── Painéis dos jogadores — lado a lado, largura total ────────────────────
+    PANEL_W = (WIDTH - 76) // 2
+    PANEL_H = 310
     P1_X = 38
     P2_X = WIDTH - PANEL_W - 38
     PANEL_Y = 118
@@ -991,12 +970,12 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
             "x": P1_X,
             "side_label": "P1",
             "controls": [
-                ("Mover",          ["A", "D"]),
-                ("Pular",          ["W"]),
-                ("Double Jump",    ["W", "W"]),
-                ("Ataque Leve",    ["F"]),
-                ("Ataque Forte",   ["G"]),
-                ("Dodge / AirDash",["S"]),
+                ("Mover",           ["A", "D"]),
+                ("Pular",           ["W"]),
+                ("Double Jump",     ["W", "W"]),
+                ("Ataque Leve",     ["F"]),
+                ("Ataque Forte",    ["G"]),
+                ("Dodge / AirDash", ["S"]),
             ],
         },
         {
@@ -1006,12 +985,12 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
             "x": P2_X,
             "side_label": "P2",
             "controls": [
-                ("Mover",          ["←", "→"]),
-                ("Pular",          ["↑"]),
-                ("Double Jump",    ["↑", "↑"]),
-                ("Ataque Leve",    ["L"]),
-                ("Ataque Forte",   ["K"]),
-                ("Dodge / AirDash",["↓"]),
+                ("Mover",           ["←", "→"]),
+                ("Pular",           ["↑"]),
+                ("Double Jump",     ["↑", "↑"]),
+                ("Ataque Leve",     ["L"]),
+                ("Ataque Forte",    ["K"]),
+                ("Dodge / AirDash", ["↓"]),
             ],
         },
     ]
@@ -1021,7 +1000,7 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
         col    = panel["color"]
         accent = panel["accent"]
 
-        # ── painel base com gradiente lateral ──────────────────────────────
+        # fundo gradiente
         panel_surf = pygame.Surface((PANEL_W, PANEL_H), pygame.SRCALPHA)
         for row in range(PANEL_H):
             t = row / PANEL_H
@@ -1031,28 +1010,23 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
             pygame.draw.line(panel_surf, (r2, g2, b2, 230), (0, row), (PANEL_W, row))
         surf.blit(panel_surf, (px, py))
 
-        # borda principal
         pygame.draw.rect(surf, col, (px, py, PANEL_W, PANEL_H), 2, border_radius=12)
 
-        # faixa de cor no topo
         top_band = pygame.Surface((PANEL_W, 46), pygame.SRCALPHA)
         top_band.fill((*col, 55))
         surf.blit(top_band, (px, py))
         pygame.draw.rect(surf, col, (px, py, PANEL_W, 46), 2, border_radius=12)
 
-        # ── etiqueta lateral com número do jogador ──────────────────────────
+        # número fantasma no canto
         try:
             num_font = pygame.font.SysFont("Arial Black", 60, bold=True)
         except Exception:
             num_font = pygame.font.Font(None, 72)
-        num_s = num_font.render(panel["side_label"], True, (*col, 30))
-        num_ghost = pygame.Surface((num_s.get_width(), num_s.get_height()), pygame.SRCALPHA)
-        num_ghost.fill((0, 0, 0, 0))
         ghost_txt = num_font.render(panel["side_label"], True, (*col, 22))
         surf.blit(ghost_txt, (px + PANEL_W - ghost_txt.get_width() - 12,
                                py + PANEL_H - ghost_txt.get_height() - 8))
 
-        # ── título do painel ────────────────────────────────────────────────
+        # título do painel
         try:
             ptitle_font = pygame.font.SysFont("Arial Black", 20, bold=True)
         except Exception:
@@ -1060,114 +1034,77 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
         pt_s = ptitle_font.render(panel["title"], True, C_WHITE)
         surf.blit(pt_s, (px + PANEL_W // 2 - pt_s.get_width() // 2, py + 12))
 
-        # separador ornamental
+        # separadores ornamentais
         pygame.draw.line(surf, col,    (px + 20, py + 52), (px + PANEL_W - 20, py + 52), 1)
         pygame.draw.line(surf, accent, (px + 60, py + 55), (px + PANEL_W - 60, py + 55), 1)
 
-        # ── linhas de ações ─────────────────────────────────────────────────
+        # linhas de ação
         action_start_y = py + 68
-        row_h = 44
+        row_h = 38
         for idx, (action, keys_list) in enumerate(panel["controls"]):
             row_y = action_start_y + idx * row_h
             _draw_action_row(surf, px + 18, row_y, action, keys_list,
                              act_font, key_font, col, accent, tick, idx)
 
-        # linha separadora inferior
         pygame.draw.line(surf, (80, 70, 120),
                          (px + 18, py + PANEL_H - 38),
                          (px + PANEL_W - 18, py + PANEL_H - 38), 1)
 
-    # ── Seção central: mecânicas do jogo ─────────────────────────────────────
-    MID_X   = WIDTH // 2
-    MECH_Y  = PANEL_Y + 10
-    MECH_W  = WIDTH - 2 * PANEL_W - 76 - 20  # espaço entre os painéis
-    MECH_X  = P1_X + PANEL_W + 10
+    # ── MECÂNICAS — faixa horizontal abaixo dos painéis ──────────────────────
+    MECH_Y = PANEL_Y + PANEL_H + 14
+    MECH_H = 80
+    MECH_X = 38
+    MECH_W = WIDTH - 76
 
-    # fundo da coluna central
-    mid_bg = pygame.Surface((MECH_W, PANEL_H - 20), pygame.SRCALPHA)
-    mid_bg.fill((8, 6, 25, 200))
-    surf.blit(mid_bg, (MECH_X, MECH_Y))
-    pygame.draw.rect(surf, (80, 60, 160), (MECH_X, MECH_Y, MECH_W, PANEL_H - 20),
-                     1, border_radius=10)
+    mech_bg = pygame.Surface((MECH_W, MECH_H), pygame.SRCALPHA)
+    mech_bg.fill((8, 6, 25, 200))
+    surf.blit(mech_bg, (MECH_X, MECH_Y))
+    pygame.draw.rect(surf, (80, 60, 160), (MECH_X, MECH_Y, MECH_W, MECH_H), 1, border_radius=10)
 
     try:
-        mech_title_font = pygame.font.SysFont("Arial Black", 14, bold=True)
-        mech_body_font  = pygame.font.SysFont("Arial", 13)
+        mech_title_font = pygame.font.SysFont("Arial Black", 11, bold=True)
+        mech_body_font  = pygame.font.SysFont("Arial", 11)
+        ico_font        = pygame.font.SysFont("Segoe UI Emoji", 18)
     except Exception:
-        mech_title_font = mech_body_font = pygame.font.Font(None, 16)
+        mech_title_font = mech_body_font = ico_font = pygame.font.Font(None, 14)
 
     mechs = [
-        ("⚔", "COMBATE",     "Empurre o inimigo\npara fora da arena"),
-        ("💥", "DANO (%)",    "Quanto maior o %,\nmais longe você voa"),
-        ("❤", "VIDAS",       "3 vidas cada.\nPerca as 3 e perde"),
-        ("🛡", "DODGE",       "Invencível durante\no dash/esquiva"),
-        ("🔀", "DOUBLE JUMP", "Pule duas vezes\nno ar"),
+        ("⚔",  "COMBATE",      "Empurre o inimigo fora da arena"),
+        ("💥",  "DANO (%)",     "Mais dano = recuo maior"),
+        ("❤",  "VIDAS",        "3 vidas — perca as 3 e perde"),
+        ("🛡",  "DODGE",        "Invencível durante o dash"),
+        ("🔀",  "DOUBLE JUMP",  "Pule duas vezes no ar"),
     ]
 
-    mech_item_h = (PANEL_H - 20 - 36) // len(mechs)
+    n_mechs = len(mechs)
+    cell_w  = MECH_W // n_mechs
+
     for i, (icon, mname, mdesc) in enumerate(mechs):
-        my = MECH_Y + 36 + i * mech_item_h
+        cx = MECH_X + i * cell_w
+        cxm = cx + cell_w // 2
+
+        # separador vertical
+        if i > 0:
+            pygame.draw.line(surf, (60, 50, 100),
+                             (cx, MECH_Y + 8), (cx, MECH_Y + MECH_H - 8), 1)
 
         # fundo alternado
         if i % 2 == 0:
-            alt_bg = pygame.Surface((MECH_W - 8, mech_item_h - 4), pygame.SRCALPHA)
-            alt_bg.fill((120, 90, 200, 18))
-            surf.blit(alt_bg, (MECH_X + 4, my))
+            alt = pygame.Surface((cell_w - 4, MECH_H - 8), pygame.SRCALPHA)
+            alt.fill((120, 90, 200, 14))
+            surf.blit(alt, (cx + 2, MECH_Y + 4))
 
         # ícone
-        try:
-            ico_font = pygame.font.SysFont("Segoe UI Emoji", 20)
-        except Exception:
-            ico_font = pygame.font.Font(None, 22)
         ico_s = ico_font.render(icon, True, C_WHITE)
-        surf.blit(ico_s, (MECH_X + 8, my + mech_item_h // 2 - ico_s.get_height() // 2))
+        surf.blit(ico_s, (cxm - ico_s.get_width() // 2 - 30, MECH_Y + 14))
 
         # nome em destaque
         mn_s = mech_title_font.render(mname, True, C_YELLOW)
-        surf.blit(mn_s, (MECH_X + 34, my + 4))
+        surf.blit(mn_s, (cxm - mn_s.get_width() // 2 + 6, MECH_Y + 16))
 
         # descrição
-        for li, line in enumerate(mdesc.split("\n")):
-            ld_s = mech_body_font.render(line, True, (185, 180, 220))
-            surf.blit(ld_s, (MECH_X + 34, my + 20 + li * 14))
-
-        # separador
-        if i < len(mechs) - 1:
-            pygame.draw.line(surf, (60, 50, 100),
-                             (MECH_X + 8, my + mech_item_h - 2),
-                             (MECH_X + MECH_W - 8, my + mech_item_h - 2), 1)
-
-    # título da coluna central
-    ct_s = mech_title_font.render("MECÂNICAS", True, (180, 140, 255))
-    surf.blit(ct_s, (MECH_X + MECH_W // 2 - ct_s.get_width() // 2, MECH_Y + 10))
-    pygame.draw.line(surf, (100, 70, 180),
-                     (MECH_X + 10, MECH_Y + 28),
-                     (MECH_X + MECH_W - 10, MECH_Y + 28), 1)
-
-    # ── Faixa de dicas na parte inferior ─────────────────────────────────────
-    tips_y = PANEL_Y + PANEL_H + 16
-    tips_bg = pygame.Surface((WIDTH - 76, 52), pygame.SRCALPHA)
-    tips_bg.fill((10, 8, 30, 200))
-    surf.blit(tips_bg, (38, tips_y))
-    pygame.draw.rect(surf, (70, 55, 130), (38, tips_y, WIDTH - 76, 52), 1, border_radius=8)
-
-    tips = [
-        "Objetivo: tire o adversário da arena para marcar pontos",
-        "O dano acumulado aumenta o recuo — ataque antes de finalizar!",
-        "Use o dodge para atravessar projéteis e criar aberturas",
-    ]
-    try:
-        tip_font2 = pygame.font.SysFont("Arial", 14)
-    except Exception:
-        tip_font2 = pygame.font.Font(None, 16)
-
-    tip_x = 60
-    bullet_col = (180, 120, 255)
-    for i, tip in enumerate(tips):
-        col_off = int(200 + 55 * math.sin(tick * 0.04 + i))
-        tip_s = tip_font2.render(f"▸  {tip}", True, (clamp(col_off), clamp(col_off - 20), clamp(col_off + 30)))
-        tstep = (WIDTH - 120) // 3
-        surf.blit(tip_s, (60 + i * tstep, tips_y + 18))
+        ld_s = mech_body_font.render(mdesc, True, (185, 180, 220))
+        surf.blit(ld_s, (cxm - ld_s.get_width() // 2, MECH_Y + 46))
 
     # ── Botão ESCOLHER PERSONAGEM ─────────────────────────────────────────────
     btn_w, btn_h = 360, 52
@@ -1186,7 +1123,6 @@ def draw_instructions(surf, font_title, font_small, font_big, tick):
     btn_bg_col = (35, 28, 65) if not hovering_btn else (55, 45, 90)
     pygame.draw.rect(surf, btn_bg_col, btn_rect, border_radius=28)
 
-    # brilho superior do botão
     btn_hl = pygame.Surface((btn_w, btn_h // 2), pygame.SRCALPHA)
     btn_hl.fill((255, 255, 255, 18 if not hovering_btn else 35))
     surf.blit(btn_hl, (btn_x, btn_y))
@@ -1568,7 +1504,6 @@ def main():
                 for _ in range(120)]
 
     def reset_to_intro():
-        """Volta completamente para a tela inicial (capa)."""
         nonlocal state, css_ready_timer, winner
         state = "intro"
         css["p1_ready"] = False
@@ -1605,7 +1540,6 @@ def main():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     if state in ("win", "game"):
-                        # ── ESC no jogo/vitória volta para a tela inicial ──
                         reset_to_intro()
                     elif state in ("char_select", "landscape_select", "instructions"):
                         state = "intro"
@@ -1663,7 +1597,6 @@ def main():
                     if event.key == pygame.K_r:
                         reset_match()
                     elif event.key == pygame.K_m:
-                        # ── M na tela de vitória → tela inicial ──────────
                         reset_to_intro()
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -1681,7 +1614,6 @@ def main():
                     if win_reiniciar_rect.collidepoint(mpos):
                         reset_match()
                     elif win_menu_rect.collidepoint(mpos):
-                        # ── Clique em MENU → tela inicial ─────────────────
                         reset_to_intro()
 
         if state == "char_select":
